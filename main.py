@@ -12,10 +12,26 @@ import torch.nn as nn
 import numpy as np
 import random
 import torch
+
 from utils import reseed
+from .create_env import create_env
+
+
+#
+
+def main():
+    seed = 695
+    reseed(seed)
+
+    env = create_env(seed) # NOTE : don't know if this requires seed
+
+    # TODO 2
+    # Initialize and train the actors
+
+    # TODO 3
+    # Evaluate,
+    # Visualize performance + videos
 
 
 
-seed = 695
 
-reseed(seed)
