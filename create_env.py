@@ -1,77 +1,76 @@
 import gymnasium as gym
+from gymnasium.utils.env_checker import check_env
+from gymnasium_robotics.envs.fetch.reach import MujocoFetchReachEnv
 import numpy as np
+import random
+import os
 
-def create_env(seed : int):
-    env = gym.make("FetchReach-v4")
 
-    # TODO 1 : specify the properties of the env
+class WhackAMoleEnv(MujocoFetchReachEnv):
+    def __init__(self, reward_type="spare", *args, **kwargs):
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        
+        xml_path = os.path.join(current_dir, "assets", "fetch", "reach.xml")
+        
+        print(f"FORCE LOADING XML FROM: {xml_path}")
+        self.reward_type=reward_type
+        super().__init__(**kwargs)
 
-    return env
+    def check_distance(self, achieved_goal, goal):
+        return np.linalg.norm(achieved_goal-goal, axis=-1)
+ 
 
-def sample_goal():
-    """
-    Choose the goal from a list of discrete positions representing thoe holes where the moles pop up from
-    """
-    holes = [
-        np.array([0.70, 0.80, 0.30]),
-        np.array([1.35, 0.80, 0.30]),
-        np.array([2.00, 0.80, 0.30]),
-        np.array([0.70, 1.00, 0.30]),
-        np.array([1.35, 1.00, 0.30]),
-        np.array([2.00, 1.00, 0.30]),
-        np.array([0.70, 1.20, 0.30]),
-        np.array([1.35, 1.20, 0.30]),
-        np.array([2.00, 1.20, 0.30]),
-    ]
-
-def visualize(env: gym.Env, algorithm=None, video_name="test"):
-    """
-        Visualize a policy network for a given algorithm on a single episode
-
-        Args:
-            - env_name: Name of the gym environment to roll out `algorithm` in,
-                it will be instantiated using gym.make or make_vec_env.
-            - algorithm (PPOActor): Algorithm whose policy network will be rolled
-                out for the episode. If no algorithm is passed in, a random policy
-                will be visualized.
-            - video_name (str): Name for the mp4 file of the episode that will be
-                saved (omit .mp4). Only used when running on local machine.
-    """
-
-    def get_action(obs):
-        if not algorithm:
-            return env.action_space.sample()
+    def compute_reward(self, achieved_goal, goal, info=None):
+        '''
+            computes the actor's reward based on how environment was initialized
+            sparse - binary reward 1 at goal 0 elsewhere
+            dense - reward is negative euclidean distance from goal
+        '''
+        distance = self.check_distance(achieved_goal, goal)
+        if self.reward_type=="sparse":
+            return (distance < self.distance_threshold).astype(np.float32)
         else:
-            return algorithm.select_action(obs)
+            return -distance
 
-    if USING_COLAB:
-        import renderlab as rl
+    def step(self, action):
+        obs, reward, terminated, truncated, info = super().step(action)
+        achieved = obs['achieved_goal']
+        goal = obs['desired_goal']
+        distance = self.check_distance(achieved, goal)
+        reward = self.compute_reward(obs['achieved_goal'], obs['desired_goal'])
+        if distance < self.distance_threshold:
+            self.goal = self._sample_goal()
+            obs['desired_goal'] = self.goal
+            # bonus for reaching the goal
+            reward += 10
+            info['is_success'] = True
+        else:
+            info['is_success'] = False
+        return obs, reward, terminated, truncated, info
 
-        directory = './video'
-        env = rl.RenderFrame(env, "output/")
-        obs, info = env.reset()
+    def _sample_goal(self):
+        """
+        Choose the goal from a list of discrete positions representing thoe holes where the moles pop up from
+        """
+        holes = [
+            np.array([0.70, 0.80, 0.45]),
+            np.array([1.35, 0.80, 0.45]),
+            np.array([2.00, 0.80, 0.45]),
+            np.array([0.70, 1.00, 0.45]),
+            np.array([1.35, 1.00, 0.45]),
+            np.array([2.00, 1.00, 0.45]),
+            np.array([0.70, 1.20, 0.45]),
+            np.array([1.35, 1.20, 0.45]),
+            np.array([2.00, 1.20, 0.45]),
+        ]
+        return random.choice(holes).copy()
 
-        for i in range(500):
-            action = get_action(obs)
-            obs, reward, terminated, truncated, info = env.step(action)
-            if terminated or truncated: break
-        env.play()
 
-    else:
-        import cv2
+gym.register(
+    id='WhackAMoleFetch',
+    entry_point=WhackAMoleEnv,
+    kwargs={}
+)
 
-        video = cv2.VideoWriter(f"{video_name}.mp4", cv2.VideoWriter_fourcc(*'mp4v'), 24, (600,400))
-        obs = env.reset()
-
-        for i in range(500):
-            action = get_action(obs)
-            obs, reward, terminated, truncated, info = env.step(action)
-            if terminated or truncated: break
-
-            im = env.render(mode='rgb_array')
-            im = im[:,:,::-1]
-            video.write(im)
-
-        video.release()
-        env.close()
-        print(f"Video saved as {video_name}.mp4")
+def create_env():
+    return gym.make('WhackAMoleFetch', render_mode='human')

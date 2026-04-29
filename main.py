@@ -14,14 +14,15 @@ import random
 import torch
 
 from utils import reseed
-from .create_env import create_env
+from create_env import create_env
+from visualization import visualize, visualize_no_actor
 
-
-#
 
 def main():
-    seed = 695
-    reseed(seed)
+    seed = 696
+    env = create_env()
+    reseed(seed, env)
+    visualize(env)
 
     env = create_env(seed) # NOTE : don't know if this requires seed
 
@@ -32,6 +33,7 @@ def main():
     # Evaluate,
     # Visualize performance + videos
 
-
+if __name__ == "__main__":
+    main()
 
 
