@@ -1,30 +1,44 @@
 import gymnasium as gym
 from gymnasium.utils.env_checker import check_env
-from gymnasium_robotics.envs.fetch.reach import MujocoFetchReachEnv
+from gymnasium_robotics.envs.fetch.reach import MujocoFetchEnv
 import numpy as np
 import random
 import os
 
 
-class WhackAMoleEnv(MujocoFetchReachEnv):
-    def __init__(self, reward_type="sparse", *args, **kwargs):
+class WhackAMoleEnv(MujocoFetchEnv):
+    def __init__(self, reward_type="sparse", render_mode='human', **kwargs):
+        # 1. Setup path
         current_dir = os.path.dirname(os.path.realpath(__file__))
-        
         xml_path = os.path.join(current_dir, "assets", "fetch", "reach.xml")
         
-        if not os.path.exists(xml_path):
-            raise FileNotFoundError(f"Missing XML at: {xml_path}")
-
-        self.reward_type = reward_type
+        # 2. Call the base constructor with ALL required positional arguments
+        # These values recreate the 'Reach' environment configuration
+        super().__init__(
+            model_path=xml_path,
+            n_substeps=20,
+            initial_qpos={
+                "robot0:slide0": 0.403,
+                "robot0:slide1": 0.481,
+                "robot0:slide2": 0.0,
+            },
+            reward_type=reward_type,
+            render_mode=render_mode,
+            # The 8 missing required arguments:
+            gripper_extra_height=0.0,
+            block_gripper=True,
+            has_object=False,          # Set to False since we are reaching, not picking
+            target_in_the_air=True,
+            target_offset=0.0,
+            obj_range=0.15,
+            target_range=0.15,
+            distance_threshold=0.05,
+            **kwargs
+        )
         
-        kwargs.pop('model_path', None)
-        super().__init__(xml_path, **kwargs)
-        
-        # Verification prints
-        print(f"--- Environment Loaded ---")
-        print(f"XML Path: {xml_path}")
-        print(f"Table Size: {self.model.geom('table0').size}")
-        print(f"Total Geoms: {self.model.ngeom}")
+        # Verification
+        if 'table0' in [self.model.geom(i).name for i in range(self.model.ngeom)]:
+            print(f"SUCCESS: Custom XML Loaded. Table size: {self.model.geom('table0').size}")
 
     def check_distance(self, achieved_goal, goal):
         return np.linalg.norm(achieved_goal-goal, axis=-1)
@@ -77,11 +91,11 @@ class WhackAMoleEnv(MujocoFetchReachEnv):
         return random.choice(holes).copy()
 
 
-gym.register(
-    id='WhackAMoleFetch',
-    entry_point=WhackAMoleEnv,
-    kwargs={}
-)
+# gym.register(
+#     id='WhackAMoleFetch',
+#     entry_point=WhackAMoleEnv,
+#     kwargs={}
+# )
 
 def create_env():
-    return gym.make('WhackAMoleFetch', render_mode='human')
+    return WhackAMoleEnv(render_mode='human')

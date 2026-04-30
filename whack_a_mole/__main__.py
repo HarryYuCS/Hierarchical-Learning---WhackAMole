@@ -24,8 +24,6 @@ def main():
     reseed(seed, env)
     visualize(env)
 
-    env = create_env(seed) # NOTE : don't know if this requires seed
-
     # TODO 2
     # Initialize and train the actors
 
