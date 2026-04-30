@@ -13,9 +13,9 @@ import numpy as np
 import random
 import torch
 
-from utils import reseed
-from create_env import create_env
-from visualization import visualize, visualize_no_actor
+from whack_a_mole.utils import reseed
+from whack_a_mole.create_env import create_env
+from whack_a_mole.visualization import visualize, visualize_no_actor
 
 
 def main():
