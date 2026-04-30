@@ -5,16 +5,13 @@ import numpy as np
 
 # TODO 2.1c : implement REINFORCE
 
-class PolicyGradient:
-    def __init__(
-      self,
-      policy_net : StochasticPolicyNet,
-    ):
+class Reinforce:
+    def __init__(self, policy_net : StochasticPolicyNet):
         """Policy gradient algorithm based on the REINFORCE algorithm, with REWARD-TO-GO
 
         Args:
             policy_net (PolicyNet): Policy network
-            reward_to_go (bool): True if using reward_to_go, False if not (False in part 1, True in part 2)
+    s        reward_to_go (bool): True if using reward_to_go, False if not (False in part 1, True in part 2)
         """
         self.policy_net = policy_net
 
@@ -36,9 +33,6 @@ class PolicyGradient:
             action (np.ndarray): Action to take
         """
         with torch.no_grad():
-          # TODO: Implement the action selection here based on the policy network output probabilities
-          # You also need to convert between numpy arrays and torch tensors
-          # HINT: Use `torch.no_grad()`
           normal_tensor = self.policy_net(torch.from_numpy(state))
           action = normal_tensor.sample()
 
@@ -46,9 +40,7 @@ class PolicyGradient:
 
     def compute_loss(
       self,
-      episode : list[tuple[
-          np.ndarray, np.ndarray, float
-      ]],
+      episode : list[tuple[np.ndarray, np.ndarray, float]],
       gamma : float
     ) -> torch.Tensor:
         """Compute the loss function J for the REINFORCE algorithm
