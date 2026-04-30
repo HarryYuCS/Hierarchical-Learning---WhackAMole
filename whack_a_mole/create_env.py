@@ -5,7 +5,6 @@ import numpy as np
 import random
 import os
 
-
 class WhackAMoleEnv(MujocoFetchReachEnv):
     def __init__(self, reward_type="sparse", *args, **kwargs):
         current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -75,7 +74,6 @@ class WhackAMoleEnv(MujocoFetchReachEnv):
             np.array([2.00, 1.20, 0.45]),
         ]
         return random.choice(holes).copy()
-
 
 gym.register(
     id='WhackAMoleFetch',
