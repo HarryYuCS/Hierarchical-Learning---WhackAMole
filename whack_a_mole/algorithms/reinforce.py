@@ -5,6 +5,9 @@ import torch.distributions as D
 import torch
 import numpy as np
 
+from whack_a_mole.algorithms.base import EvalResult, RLAlgorithm, TrainConfig, TrainResult
+from whack_a_mole.algorithms.utils import flatten_observation
+
 # TODO 2.1c : implement REINFORCE
 
 class StochasticPolicyNet(nn.Module):
@@ -38,7 +41,7 @@ class StochasticPolicyNet(nn.Module):
         return D.Normal(mu, torch.exp(ln_sigma))
 
 
-class Reinforce:
+class Reinforce(RLAlgorithm):
     def __init__(self, policy_net : StochasticPolicyNet):
         """Policy gradient algorithm based on the REINFORCE algorithm, with REWARD-TO-GO
 
@@ -57,11 +60,15 @@ class Reinforce:
         Returns:
             action (np.ndarray): Action to take
         """
-        with torch.no_grad():
-          normal_tensor = self.policy_net(torch.from_numpy(state))
-          action = normal_tensor.sample()
+        return self.predict(state, deterministic=False)
 
-          return action.numpy()
+    def predict(self, obs, deterministic: bool = True) -> np.ndarray:
+        state = flatten_observation(obs)
+        with torch.no_grad():
+            state_tensor = torch.from_numpy(state).to(self.device)
+            normal_tensor = self.policy_net(state_tensor)
+            action = normal_tensor.mean if deterministic else normal_tensor.sample()
+            return action.cpu().numpy()
 
     def compute_loss(
       self,
@@ -118,6 +125,93 @@ class Reinforce:
         optimizer.step()
 
         return loss.item()
+
+    def train(self, env, config: TrainConfig) -> TrainResult:
+        """
+        Wraps training loop given config
+        
+        for step in episodes:
+            gather rollout
+
+            update policy:
+                compute loss for rollout
+                step optimizer
+        
+        """
+        optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=config.learning_rate)
+        history_rewards = []
+        history_losses = []
+        timesteps = 0
+
+        for _ in range(config.episodes):
+            obs, _ = env.reset(seed=config.seed)
+            episode = []
+            episode_reward = 0.0
+
+            for _ in range(config.max_steps_per_episode):
+                state = flatten_observation(obs)
+                action = self.predict(state, deterministic=False)
+                next_obs, reward, terminated, truncated, _ = env.step(action)
+                episode.append((state, action, float(reward)))
+                episode_reward += float(reward)
+                timesteps += 1
+                obs = next_obs
+                if terminated or truncated:
+                    break
+
+            loss = self.update_policy([episode], optimizer, config.gamma)
+            history_rewards.append(episode_reward)
+            history_losses.append(loss)
+
+        return TrainResult(
+            episode_rewards=history_rewards,
+            losses=history_losses,
+            timesteps=timesteps,
+            metadata={"algorithm": "reinforce"},
+        )
+
+    def evaluate(self, env, episodes: int = 10, deterministic: bool = True) -> EvalResult:
+        """
+        Evaluate the reward attainment across a number of episodes
+        """
+        rewards = []
+        successes = []
+
+        for _ in range(episodes):
+            obs, _ = env.reset()
+            total = 0.0
+            final_success = 0.0
+            for _ in range(500):
+                action = self.predict(obs, deterministic=deterministic)
+                obs, reward, terminated, truncated, info = env.step(action)
+                total += float(reward)
+                final_success = float(info.get("is_success", 0.0))
+                if terminated or truncated:
+                    break
+            rewards.append(total)
+            successes.append(final_success)
+
+        return EvalResult(
+            mean_reward=float(np.mean(rewards) if rewards else 0.0),
+            std_reward=float(np.std(rewards) if rewards else 0.0),
+            success_rate=float(np.mean(successes) if successes else 0.0),
+            episode_rewards=rewards,
+        )
+
+    def save(self, path: str) -> None:
+        torch.save(self.policy_net.state_dict(), path)
+
+    @classmethod
+    def load(cls, path: str, env=None, policy_net: StochasticPolicyNet | None = None):
+        if policy_net is None:
+            if env is None:
+                raise ValueError("env must be provided when policy_net is not supplied")
+            obs, _ = env.reset()
+            state_dim = flatten_observation(obs).shape[0]
+            action_dim = int(np.prod(env.action_space.shape))
+            policy_net = StochasticPolicyNet(state_dim, action_dim, hidden_dim=128)
+        policy_net.load_state_dict(torch.load(path, map_location="cpu"))
+        return cls(policy_net)
     
     @property
     def device(self):
@@ -126,3 +220,6 @@ class Reinforce:
     def to(self, device : str | torch.device):
         self.policy_net.to(device)
         return self
+
+    def select_action(self, obs):
+        return self.predict(obs, deterministic=True)
