@@ -100,6 +100,47 @@ class WhackAMoleEnv(MujocoFetchEnv):
             np.array([1.70, 0.9451, 0.45]),
         ]
         return random.choice(holes).copy()
-    
+
+class WhackAMoleObservationWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        # We need to update the observation space shape because we are shrinking it
+        # 3 (pos) + 3 (vel) + 3 (goal) + 3 (rel_pos) = 12
+        new_shape = (12,)
+        self.observation_space = gym.spaces.Dict({
+            "observation": gym.spaces.Box(-np.inf, np.inf, new_shape, dtype=np.float32),
+            "achieved_goal": env.observation_space["achieved_goal"],
+            "desired_goal": env.observation_space["desired_goal"],
+        })
+
+    def get_hammer_velocity(self):
+        # Helper to get the 3D linear velocity of the tip
+        site_id = self.model.site('hammer_tip').id
+        vel = np.zeros(6)
+        mujoco.mj_objectVelocity(self.model, self.data, mujoco.mjtObj.mjOBJ_SITE, site_id, vel, 0)
+        return vel[3:] # Return only the linear X, Y, Z
+
+    def observation(self, obs):
+        hammer_pos = obs['achieved_goal']
+        goal_pos = obs['desired_goal']
+        hammer_vel = self.get_hammer_velocity()
+        rel_pos = goal_pos - hammer_pos
+        
+        # Combine into our new 12-dimensional vector
+        low_dim_obs = np.concatenate([
+            hammer_pos, 
+            hammer_vel, 
+            goal_pos, 
+            rel_pos
+        ]).astype(np.float32)
+        
+        return {
+            "observation": low_dim_obs,
+            "achieved_goal": hammer_pos,
+            "desired_goal": goal_pos
+        }  
+
 def create_env():
-    return WhackAMoleEnv(render_mode='human')
+    env =  WhackAMoleEnv(render_mode='human')
+    env = WhackAMoleObservationWrapper(env)
+    return env
