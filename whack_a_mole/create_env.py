@@ -8,12 +8,9 @@ import os
 
 class WhackAMoleEnv(MujocoFetchEnv):
     def __init__(self, reward_type="sparse", render_mode='human', **kwargs):
-        # 1. Setup path
         current_dir = os.path.dirname(os.path.realpath(__file__))
         xml_path = os.path.join(current_dir, "assets", "fetch", "reach.xml")
         
-        # 2. Call the base constructor with ALL required positional arguments
-        # These values recreate the 'Reach' environment configuration
         super().__init__(
             model_path=xml_path,
             n_substeps=20,
@@ -24,10 +21,9 @@ class WhackAMoleEnv(MujocoFetchEnv):
             },
             reward_type=reward_type,
             render_mode=render_mode,
-            # The 8 missing required arguments:
             gripper_extra_height=0.0,
             block_gripper=True,
-            has_object=False,          # Set to False since we are reaching, not picking
+            has_object=False,
             target_in_the_air=True,
             target_offset=0.0,
             obj_range=0.15,
@@ -36,7 +32,6 @@ class WhackAMoleEnv(MujocoFetchEnv):
             **kwargs
         )
         
-        # Verification
         if 'table0' in [self.model.geom(i).name for i in range(self.model.ngeom)]:
             print(f"SUCCESS: Custom XML Loaded. Table size: {self.model.geom('table0').size}")
 
@@ -50,7 +45,8 @@ class WhackAMoleEnv(MujocoFetchEnv):
             dense - reward is negative euclidean distance from goal
         '''
         distance = self.check_distance(achieved_goal, goal)
-        if self.reward_type=="sparse":
+        
+        if self.reward_type == "sparse":
             return (distance < self.distance_threshold).astype(np.float32)
         else:
             return -distance
@@ -59,43 +55,59 @@ class WhackAMoleEnv(MujocoFetchEnv):
         obs, reward, terminated, truncated, info = super().step(action)
         achieved = obs['achieved_goal']
         goal = obs['desired_goal']
+        
         distance = self.check_distance(achieved, goal)
-        reward = self.compute_reward(obs['achieved_goal'], obs['desired_goal'])
-        if distance < self.distance_threshold:
+        
+        hammer_vel = self.data.site('hammer_tip').xvelp.copy()
+        
+        # IMPORTANT: Select the correct axis (0 for X, 1 for Y, 2 for Z)
+        # Based on your previous rotation, we assume Y is "down" toward the table.
+        # If it's Z, change this to hammer_vel[2]
+        strike_velocity = hammer_vel[1] 
+        
+        # Define how fast it must be moving (e.g., -0.2 m/s)
+        velocity_threshold = -0.2 
+        
+        # 4. Evaluate the Whack
+        is_close = distance < self.distance_threshold
+        is_fast_enough = strike_velocity < velocity_threshold
+        
+        # A whack is only successful if BOTH conditions are met
+        is_whack = is_close and is_fast_enough
+
+        # Recalculate base reward
+        reward = self.compute_reward(achieved, goal, info)
+
+        # 5. Apply Game Logic
+        if is_whack:
+            # Pop up a new mole!
             self.goal = self._sample_goal()
-            obs['desired_goal'] = self.goal
-            # bonus for reaching the goal
-            # TODO:
-            # requires: velocity within a magnitude and direction threshold to achieeve
+            obs['desired_goal'] = self.goal.copy()
+            
+            # Apply the +10 bonus for a valid strike
             reward += 10
             info['is_success'] = True
         else:
             info['is_success'] = False
+            
         return obs, reward, terminated, truncated, info
-
+    
     def _sample_goal(self):
         """
         Choose the goal from a list of discrete positions representing thoe holes where the moles pop up from
         """
         holes = [
-            np.array([0.70, 0.80, 0.45]),
-            np.array([1.35, 0.80, 0.45]),
-            np.array([2.00, 0.80, 0.45]),
-            np.array([0.70, 1.00, 0.45]),
-            np.array([1.35, 1.00, 0.45]),
-            np.array([2.00, 1.00, 0.45]),
-            np.array([0.70, 1.20, 0.45]),
-            np.array([1.35, 1.20, 0.45]),
-            np.array([2.00, 1.20, 0.45]),
+            np.array([0.70, 0.5451, 0.45]),
+            np.array([1.20, 0.5451, 0.45]),
+            np.array([1.70, 0.5451, 0.45]),
+            np.array([0.70, 0.7451, 0.45]),
+            np.array([1.20, 0.7451, 0.45]),
+            np.array([1.70, 0.7451, 0.45]),
+            np.array([0.70, 0.9451, 0.45]),
+            np.array([1.20, 0.9451, 0.45]),
+            np.array([1.70, 0.9451, 0.45]),
         ]
         return random.choice(holes).copy()
-
-
-# gym.register(
-#     id='WhackAMoleFetch',
-#     entry_point=WhackAMoleEnv,
-#     kwargs={}
-# )
-
+    
 def create_env():
     return WhackAMoleEnv(render_mode='human')
