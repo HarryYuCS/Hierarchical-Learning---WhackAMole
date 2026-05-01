@@ -34,12 +34,12 @@ def visualize(env: gym.Env, algorithm=None, video_name="test"):
         if not algorithm:
             return env.action_space.sample()
         else:
-            return algorithm.select_action(obs)
+            return algorithm.predict(obs, deterministic=True)
 
     import cv2
 
     video = cv2.VideoWriter(f"{video_name}.mp4", cv2.VideoWriter_fourcc(*'mp4v'), 24, (600,400))
-    obs = env.reset()
+    obs, _ = env.reset()
 
     for i in range(500):
         action = get_action(obs)
