@@ -9,17 +9,17 @@ class QNet(nn.Module):
     """
     A neural net to learn the Q function
     """
-    def __init__(self, reward_dim : int, state_dim : int):
+    def __init__(self, action_dim: int, state_dim: int):
         """
         Initializes a neural net to approximate the q function given state and action
         
         Args:
-            reward_dim : int
+            action_dim : int
             state_dim : int
         """
         super().__init__()
         hidden_dim = 128
-        input_dim = state_dim + reward_dim
+        input_dim = state_dim + action_dim
         self.model = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
@@ -215,4 +215,3 @@ class QLearningActor(RLAlgorithm):
 
     def select_action(self, obs):
         return self.predict(obs, deterministic=True)
-

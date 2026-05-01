@@ -1,5 +1,5 @@
 from whack_a_mole.algorithms.base import EvalResult, RLAlgorithm, TrainConfig, TrainResult
-from whack_a_mole.algorithms.ppo_actor import PPOActor
+from whack_a_mole.algorithms.ppo import PPOActor
 from whack_a_mole.algorithms.q_learning import QLearningActor, QNet
 from whack_a_mole.algorithms.reinforce import Reinforce, StochasticPolicyNet
 

@@ -23,7 +23,7 @@ def visualize(env: gym.Env, algorithm=None, video_name="test"):
         Args:
             - env_name: Name of the gym environment to roll out `algorithm` in,
                 it will be instantiated using gym.make or make_vec_env.
-            - algorithm (PPOActor): Algorithm whose policy network will be rolled
+            - algorithm (RLAlgorithm): Algorithm whose policy network will be rolled
                 out for the episode. If no algorithm is passed in, a random policy
                 will be visualized.
             - video_name (str): Name for the mp4 file of the episode that will be
