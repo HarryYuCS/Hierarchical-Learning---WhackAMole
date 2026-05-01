@@ -4,7 +4,7 @@ from gymnasium_robotics.envs.fetch.reach import MujocoFetchEnv
 import numpy as np
 import random
 import os
-
+import mujoco
 
 class WhackAMoleEnv(MujocoFetchEnv):
     def __init__(self, reward_type="sparse", render_mode='human', **kwargs):
@@ -53,38 +53,30 @@ class WhackAMoleEnv(MujocoFetchEnv):
 
     def step(self, action):
         obs, reward, terminated, truncated, info = super().step(action)
+        
+        # 1. Get the ID of your hammer tip site
+        site_id = self.model.site('hammer_tip').id
+        
+        # 2. Prepare a 6D array (3 for rotational, 3 for linear velocity)
+        site_vel = np.zeros(6)
+        
+        # 3. Use the MuJoCo engine to compute the velocity in the world frame (0)
+        mujoco.mj_objectVelocity(self.model, self.data, mujoco.mjtObj.mjOBJ_SITE, site_id, site_vel, 0)
+        
+        # The result is [rot_x, rot_y, rot_z, lin_x, lin_y, lin_z]
+        # In your hammer setup, index 4 (Linear Y) or 5 (Linear Z) is your strike speed
+        strike_velocity = site_vel[4] 
+        
+        # Now apply your logic
         achieved = obs['achieved_goal']
         goal = obs['desired_goal']
-        
         distance = self.check_distance(achieved, goal)
         
-        hammer_vel = self.data.site('hammer_tip').xvelp.copy()
-        
-        # IMPORTANT: Select the correct axis (0 for X, 1 for Y, 2 for Z)
-        # Based on your previous rotation, we assume Y is "down" toward the table.
-        # If it's Z, change this to hammer_vel[2]
-        strike_velocity = hammer_vel[1] 
-        
-        # Define how fast it must be moving (e.g., -0.2 m/s)
-        velocity_threshold = -0.2 
-        
-        # 4. Evaluate the Whack
-        is_close = distance < self.distance_threshold
-        is_fast_enough = strike_velocity < velocity_threshold
-        
-        # A whack is only successful if BOTH conditions are met
-        is_whack = is_close and is_fast_enough
-
-        # Recalculate base reward
-        reward = self.compute_reward(achieved, goal, info)
-
-        # 5. Apply Game Logic
-        if is_whack:
-            # Pop up a new mole!
+        # Whack detected if close AND moving fast enough
+        # (Using -0.2 as a starting threshold for downward movement)
+        if distance < self.distance_threshold and strike_velocity < -0.2:
             self.goal = self._sample_goal()
-            obs['desired_goal'] = self.goal.copy()
-            
-            # Apply the +10 bonus for a valid strike
+            obs['desired_goal'] = self.goal
             reward += 10
             info['is_success'] = True
         else:
