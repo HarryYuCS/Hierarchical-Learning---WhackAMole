@@ -54,29 +54,23 @@ class WhackAMoleEnv(MujocoFetchEnv):
     def step(self, action):
         obs, reward, terminated, truncated, info = super().step(action)
         
-        # 1. Get the ID of your hammer tip site
-        site_id = self.model.site('hammer_tip').id
+        # Use self.unwrapped to ensure we are talking to the MuJoCo engine
+        model = self.unwrapped.model
+        data = self.unwrapped.data
         
-        # 2. Prepare a 6D array (3 for rotational, 3 for linear velocity)
+        site_id = model.site('hammer_tip').id
         site_vel = np.zeros(6)
+        mujoco.mj_objectVelocity(model, data, mujoco.mjtObj.mjOBJ_SITE, site_id, site_vel, 0)
         
-        # 3. Use the MuJoCo engine to compute the velocity in the world frame (0)
-        mujoco.mj_objectVelocity(self.model, self.data, mujoco.mjtObj.mjOBJ_SITE, site_id, site_vel, 0)
-        
-        # The result is [rot_x, rot_y, rot_z, lin_x, lin_y, lin_z]
-        # In your hammer setup, index 4 (Linear Y) or 5 (Linear Z) is your strike speed
         strike_velocity = site_vel[4] 
         
-        # Now apply your logic
         achieved = obs['achieved_goal']
         goal = obs['desired_goal']
         distance = self.check_distance(achieved, goal)
         
-        # Whack detected if close AND moving fast enough
-        # (Using -0.2 as a starting threshold for downward movement)
         if distance < self.distance_threshold and strike_velocity < -0.2:
             self.goal = self._sample_goal()
-            obs['desired_goal'] = self.goal
+            obs['desired_goal'] = self.goal.copy()
             reward += 10
             info['is_success'] = True
         else:
@@ -104,8 +98,6 @@ class WhackAMoleEnv(MujocoFetchEnv):
 class WhackAMoleObservationWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
-        # We need to update the observation space shape because we are shrinking it
-        # 3 (pos) + 3 (vel) + 3 (goal) + 3 (rel_pos) = 12
         new_shape = (12,)
         self.observation_space = gym.spaces.Dict({
             "observation": gym.spaces.Box(-np.inf, np.inf, new_shape, dtype=np.float32),
@@ -114,11 +106,15 @@ class WhackAMoleObservationWrapper(gym.ObservationWrapper):
         })
 
     def get_hammer_velocity(self):
-        # Helper to get the 3D linear velocity of the tip
-        site_id = self.model.site('hammer_tip').id
+        # The key is self.unwrapped
+        model = self.unwrapped.model
+        data = self.unwrapped.data
+        
+        site_id = model.site('hammer_tip').id
         vel = np.zeros(6)
-        mujoco.mj_objectVelocity(self.model, self.data, mujoco.mjtObj.mjOBJ_SITE, site_id, vel, 0)
-        return vel[3:] # Return only the linear X, Y, Z
+        mujoco.mj_objectVelocity(model, data, mujoco.mjtObj.mjOBJ_SITE, site_id, vel, 0)
+        
+        return vel[3:] 
 
     def observation(self, obs):
         hammer_pos = obs['achieved_goal']
@@ -126,7 +122,6 @@ class WhackAMoleObservationWrapper(gym.ObservationWrapper):
         hammer_vel = self.get_hammer_velocity()
         rel_pos = goal_pos - hammer_pos
         
-        # Combine into our new 12-dimensional vector
         low_dim_obs = np.concatenate([
             hammer_pos, 
             hammer_vel, 
@@ -138,7 +133,7 @@ class WhackAMoleObservationWrapper(gym.ObservationWrapper):
             "observation": low_dim_obs,
             "achieved_goal": hammer_pos,
             "desired_goal": goal_pos
-        }  
+        }
 
 def create_env():
     env =  WhackAMoleEnv(render_mode='human')
