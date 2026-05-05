@@ -19,6 +19,8 @@ class TrainConfig:
     eval_episodes: int = 5
     seed: int | None = None
     device: str = "cpu"
+    show_progress: bool = True
+    log_every: int = 10
 
 
 @dataclass

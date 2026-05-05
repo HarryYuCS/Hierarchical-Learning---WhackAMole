@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from tqdm import trange
 
 from whack_a_mole.algorithms.base import EvalResult, RLAlgorithm, TrainConfig, TrainResult
 from whack_a_mole.algorithms.utils import flatten_observation
@@ -51,12 +52,21 @@ class QLearningActor(RLAlgorithm):
         self.action_high = np.asarray(action_space.high, dtype=np.float32)
         self.action_dim = int(np.prod(action_space.shape))
 
+    def _ensure_qnet_dimensions(self, state_dim: int, action_dim: int) -> None:
+        expected = state_dim + action_dim
+        current = self.q_net.model[0].in_features
+        if current == expected:
+            return
+        device = self.device
+        self.q_net = QNet(action_dim=action_dim, state_dim=state_dim).to(device)
+
     def predict(self, obs, deterministic: bool = True) -> np.ndarray:
         state = flatten_observation(obs)
         if self.action_dim is None:
             self.action_dim = 4
             self.action_low = -np.ones(self.action_dim, dtype=np.float32)
             self.action_high = np.ones(self.action_dim, dtype=np.float32)
+        self._ensure_qnet_dimensions(state_dim=state.shape[0], action_dim=self.action_dim)
 
         candidates = 256 if deterministic else 64
         actions = np.random.uniform(self.action_low, self.action_high, size=(candidates, self.action_dim)).astype(np.float32)
@@ -125,12 +135,19 @@ class QLearningActor(RLAlgorithm):
 
         """
         self.configure_action_space(env.action_space)
+        self.to(config.device)
+        init_obs, _ = env.reset(seed=config.seed)
+        self._ensure_qnet_dimensions(
+            state_dim=flatten_observation(init_obs).shape[0],
+            action_dim=self.action_dim,
+        )
         optimizer = torch.optim.Adam(self.q_net.parameters(), lr=config.learning_rate)
         history_rewards = []
         history_losses = []
         timesteps = 0
 
-        for _ in range(config.episodes):
+        episode_iter = trange(config.episodes, desc="Q-Learning", disable=not config.show_progress)
+        for episode_idx in episode_iter:
             # gather rollout
             obs, _ = env.reset(seed=config.seed)
             episode_transitions = []
@@ -152,6 +169,21 @@ class QLearningActor(RLAlgorithm):
             history_rewards.append(total_reward)
             history_losses.append(loss)
 
+            if config.show_progress:
+                episode_iter.set_postfix(
+                    loss=f"{loss:.4f}",
+                    reward=f"{total_reward:.2f}",
+                    steps=timesteps,
+                )
+            if config.log_every > 0 and ((episode_idx + 1) % config.log_every == 0 or episode_idx == 0):
+                recent_n = min(config.log_every, len(history_losses))
+                avg_loss = float(np.mean(history_losses[-recent_n:]))
+                avg_reward = float(np.mean(history_rewards[-recent_n:]))
+                print(
+                    f"[Q-Learning] episode={episode_idx + 1}/{config.episodes} "
+                    f"avg_loss={avg_loss:.4f} avg_reward={avg_reward:.2f} timesteps={timesteps}"
+                )
+
         return TrainResult(
             episode_rewards=history_rewards,
             losses=history_losses,
@@ -164,6 +196,11 @@ class QLearningActor(RLAlgorithm):
         Evaluate the reward attainment across a number of episodes
         """
         self.configure_action_space(env.action_space)
+        init_obs, _ = env.reset()
+        self._ensure_qnet_dimensions(
+            state_dim=flatten_observation(init_obs).shape[0],
+            action_dim=self.action_dim,
+        )
         rewards = []
         successes = []
         for _ in range(episodes):

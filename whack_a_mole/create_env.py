@@ -135,7 +135,7 @@ class WhackAMoleObservationWrapper(gym.ObservationWrapper):
             "desired_goal": goal_pos
         }
 
-def create_env():
-    env =  WhackAMoleEnv(render_mode='human')
-    env = WhackAMoleObservationWrapper(env)
+def create_env(render_mode=None, reward_type="sparse"):
+    env = WhackAMoleEnv(render_mode=render_mode)
+    env = WhackAMoleObservationWrapper(env, reward_type=reward_type)
     return env

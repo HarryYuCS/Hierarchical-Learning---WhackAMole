@@ -1,4 +1,5 @@
 import gymnasium as gym
+import numpy as np
 
 def visualize_no_actor():
     env = gym.make("FetchReach-v4", render_mode="human")
@@ -37,9 +38,22 @@ def visualize(env: gym.Env, algorithm=None, video_name="test"):
             return algorithm.predict(obs, deterministic=True)
 
     import cv2
-
-    video = cv2.VideoWriter(f"{video_name}.mp4", cv2.VideoWriter_fourcc(*'mp4v'), 24, (600,400))
     obs, _ = env.reset()
+
+    first_frame = env.render()
+    if first_frame is None:
+        raise ValueError("visualize requires env with render_mode='rgb_array' to save mp4")
+    if not isinstance(first_frame, np.ndarray) or first_frame.ndim != 3:
+        raise ValueError("env.render() did not return an RGB frame")
+
+    height, width = first_frame.shape[:2]
+    video = cv2.VideoWriter(
+        f"{video_name}.mp4",
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        24,
+        (width, height),
+    )
+    video.write(cv2.cvtColor(first_frame, cv2.COLOR_RGB2BGR))
 
     for i in range(500):
         action = get_action(obs)
@@ -47,7 +61,8 @@ def visualize(env: gym.Env, algorithm=None, video_name="test"):
         if terminated or truncated: break
 
         im = env.render()
-        # video.write(im)
+        if im is not None:
+            video.write(cv2.cvtColor(im, cv2.COLOR_RGB2BGR))
 
     video.release()
     env.close()

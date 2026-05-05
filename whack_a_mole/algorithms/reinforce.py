@@ -4,6 +4,7 @@ import torch.nn.functional as f
 import torch.distributions as D
 import torch
 import numpy as np
+from tqdm import trange
 
 from whack_a_mole.algorithms.base import EvalResult, RLAlgorithm, TrainConfig, TrainResult
 from whack_a_mole.algorithms.utils import flatten_observation
@@ -143,7 +144,8 @@ class Reinforce(RLAlgorithm):
         history_losses = []
         timesteps = 0
 
-        for _ in range(config.episodes):
+        episode_iter = trange(config.episodes, desc="REINFORCE", disable=not config.show_progress)
+        for episode_idx in episode_iter:
             obs, _ = env.reset(seed=config.seed)
             episode = []
             episode_reward = 0.0
@@ -162,6 +164,21 @@ class Reinforce(RLAlgorithm):
             loss = self.update_policy([episode], optimizer, config.gamma)
             history_rewards.append(episode_reward)
             history_losses.append(loss)
+
+            if config.show_progress:
+                episode_iter.set_postfix(
+                    loss=f"{loss:.4f}",
+                    reward=f"{episode_reward:.2f}",
+                    steps=timesteps,
+                )
+            if config.log_every > 0 and ((episode_idx + 1) % config.log_every == 0 or episode_idx == 0):
+                recent_n = min(config.log_every, len(history_losses))
+                avg_loss = float(np.mean(history_losses[-recent_n:]))
+                avg_reward = float(np.mean(history_rewards[-recent_n:]))
+                print(
+                    f"[REINFORCE] episode={episode_idx + 1}/{config.episodes} "
+                    f"avg_loss={avg_loss:.4f} avg_reward={avg_reward:.2f} timesteps={timesteps}"
+                )
 
         return TrainResult(
             episode_rewards=history_rewards,
