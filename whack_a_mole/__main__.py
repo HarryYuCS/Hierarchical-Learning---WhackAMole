@@ -23,7 +23,7 @@ from whack_a_mole.algorithms import TrainConfig, make_algorithm, QNet, QLearning
 
 def main():
     seed = 696
-    train_env = create_env(render_mode=None)
+    train_env = create_env(render_mode=None, reward_type="dense")
     reseed(seed, train_env)
 
     # TODO 2
@@ -42,7 +42,7 @@ def main():
     q_net = QNet(action_dim=action_dim, state_dim=state_dim)
     q_actor = make_algorithm(name="q_learning", q_net=q_net)
 
-    ckpt_path = Path("model_checkpoints/q_learning.pt")
+    ckpt_path = Path("model_checkpoints/q_learning_dense.pt")
     ckpt_path.parent.mkdir(parents=True, exist_ok=True)
 
     if ckpt_path.exists():
@@ -61,7 +61,7 @@ def main():
     train_env.close()
     video_env = create_env(render_mode="rgb_array")
     reseed(seed, video_env)
-    visualize(video_env, q_actor, "q_test")
+    visualize(video_env, q_actor, "q_test_dense")
 
 if __name__ == "__main__":
     main()

@@ -136,6 +136,6 @@ class WhackAMoleObservationWrapper(gym.ObservationWrapper):
         }
 
 def create_env(render_mode=None, reward_type="sparse"):
-    env = WhackAMoleEnv(render_mode=render_mode)
-    env = WhackAMoleObservationWrapper(env, reward_type=reward_type)
+    env = WhackAMoleEnv(render_mode=render_mode, reward_type=reward_type)
+    env = WhackAMoleObservationWrapper(env)
     return env
