@@ -7,7 +7,7 @@ from whack_a_mole.algorithms.base import EvalResult, RLAlgorithm, TrainConfig, T
 
 
 class PPOActor(RLAlgorithm):
-    def __init__(self, ckpt: str=None, environment=None, model=None):
+    def __init__(self, ckpt: str=None, environment=None, model=None, policy: str = "MultiInputPolicy"):
         '''
           Requires environment to be a 1-vectorized environment
 
@@ -18,15 +18,17 @@ class PPOActor(RLAlgorithm):
           that as the internal representing model instead of loading one from the
           checkpoint path
         '''
-        assert ckpt is not None or model is not None
+        self.environment = environment
+        self.policy = policy
 
         if model is not None:
             self.model = model
-            self.environment = environment
             return
 
-        self.model = PPO.load(ckpt, environment)
-        self.environment = environment
+        if ckpt is not None:
+            self.model = PPO.load(ckpt, environment)
+        else:
+            self.model = None
 
     def predict(self, obs, deterministic: bool = True):
         '''Gives the action prediction of this particular actor'''
@@ -36,7 +38,19 @@ class PPOActor(RLAlgorithm):
     def train(self, env, config: TrainConfig) -> TrainResult:
         self.environment = env
         total_timesteps = config.episodes * config.max_steps_per_episode
-        self.model.set_env(env)
+        if self.model is None:
+            self.model = PPO(
+                self.policy,
+                env,
+                gamma=config.gamma,
+                learning_rate=config.learning_rate,
+                seed=config.seed,
+                verbose=1 if config.show_progress else 0,
+                n_steps=1024,
+                batch_size=64,
+            )
+        else:
+            self.model.set_env(env)
         self.model.learn(total_timesteps=total_timesteps)
         return TrainResult(
             episode_rewards=[],

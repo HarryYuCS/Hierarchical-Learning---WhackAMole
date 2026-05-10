@@ -149,12 +149,17 @@ class QLearningActor(RLAlgorithm):
         episode_iter = trange(config.episodes, desc="Q-Learning", disable=not config.show_progress)
         for episode_idx in episode_iter:
             # gather rollout
-            obs, _ = env.reset(seed=config.seed)
+            episode_seed = None if config.seed is None else config.seed + episode_idx
+            obs, _ = env.reset(seed=episode_seed)
             episode_transitions = []
             total_reward = 0.0
+            epsilon = max(0.1, 1.0 - episode_idx / max(1, config.episodes - 1))
             for _ in range(config.max_steps_per_episode):
                 state = flatten_observation(obs)
-                action = self.predict(state, deterministic=False)
+                if np.random.random() < epsilon:
+                    action = env.action_space.sample()
+                else:
+                    action = self.predict(state, deterministic=False)
                 next_obs, reward, terminated, truncated, _ = env.step(action)
                 next_state = flatten_observation(next_obs)
                 done = bool(terminated or truncated)
