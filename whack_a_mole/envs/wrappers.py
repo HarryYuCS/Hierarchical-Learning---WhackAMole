@@ -16,7 +16,7 @@ class HammerUseObservationWrapper(gym.ObservationWrapper):
         super().__init__(env)
         self.observation_space = gym.spaces.Dict(
             {
-                "observation": gym.spaces.Box(-np.inf, np.inf, (12,), dtype=np.float32),
+                "observation": gym.spaces.Box(-np.inf, np.inf, (17,), dtype=np.float32),
                 "achieved_goal": env.observation_space["achieved_goal"],
                 "desired_goal": env.observation_space["desired_goal"],
             }
@@ -34,8 +34,14 @@ class HammerUseObservationWrapper(gym.ObservationWrapper):
         hammer_pos = self.unwrapped.get_hammer_tip_position()
         goal_pos = obs["desired_goal"]
         hammer_vel = self.unwrapped.get_hammer_tip_velocity()
+        grip_pos = self.unwrapped.get_gripper_position()
+        gripper_state, _ = self.unwrapped.get_gripper_state()
+        gripper_aperture = np.array([float(np.mean(gripper_state))], dtype=np.float32)
+        held_flag = np.array([float(self.unwrapped.is_hammer_grasped())], dtype=np.float32)
         rel_pos = goal_pos - hammer_pos
-        low_dim_obs = np.concatenate([hammer_pos, hammer_vel, goal_pos, rel_pos]).astype(np.float32)
+        low_dim_obs = np.concatenate(
+            [hammer_pos, hammer_vel, goal_pos, rel_pos, grip_pos, gripper_aperture, held_flag]
+        ).astype(np.float32)
         return {
             "observation": low_dim_obs,
             "achieved_goal": np.asarray(obs["achieved_goal"], dtype=np.float32),

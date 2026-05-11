@@ -2,28 +2,38 @@ from pathlib import Path
 
 from whack_a_mole.utils import reseed
 from whack_a_mole.create_env import create_env
+from whack_a_mole.evaluation import evaluate_actor
 from whack_a_mole.visualization import visualize, visualize_no_actor
+from whack_a_mole.training_viz import plot_training_metrics
 
 from whack_a_mole.actors import PPOActor, StitchedPPOActor, TrainConfig, SACActor
 
+def load_or_train_sac(task: str, ckpt_name: str, seed : int, ckpt_dir : str, train_config : TrainConfig) -> SACActor:
+    env = create_env(render_mode=None, task=task)
+    reseed(seed, env)
+    actor = SACActor(environment=env)
+    ckpt_path = ckpt_dir / ckpt_name
+    if ckpt_path.exists():
+        actor = SACActor.load(str(ckpt_path), env=env)
+        print(f"Loaded checkpoint from {ckpt_path}")
+    else:
+        result = actor.train(env, train_config)
+        actor.save(str(ckpt_path))
+        plot_path = ckpt_dir / f"{ckpt_path.stem}_metrics.png"
+        plot_training_metrics(result, plot_path, title=f"SAC {task} training metrics")
+        print(f"Saved training plot to {plot_path}")
+        print(f"Trained {task}: timesteps={result.timesteps}")
+    env.close()
+    return actor
 
-def evaluate_actor(env, actor, episodes: int = 10):
-    rewards = []
-    successes = []
-    for _ in range(episodes):
-        obs, _ = env.reset()
-        total = 0.0
-        final_success = 0.0
-        for _ in range(500):
-            action = actor.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = env.step(action)
-            total += float(reward)
-            final_success = float(info.get("is_success", 0.0))
-            if terminated or truncated:
-                break
-        rewards.append(total)
-        successes.append(final_success)
-    return float(sum(rewards) / max(len(rewards), 1)), float(sum(successes) / max(len(successes), 1))
+def model_matches_env(actor, env) -> bool:
+    model = getattr(actor, "model", None)
+    if model is None:
+        return False
+    try:
+        return model.observation_space == env.observation_space and model.action_space == env.action_space
+    except Exception:
+        return False
 
 
 def inspect_stitched_switching(env, stitched_actor, episodes: int = 3):
@@ -72,10 +82,22 @@ def main():
         ckpt_path = ckpt_dir / ckpt_name
         if ckpt_path.exists():
             actor = PPOActor.load(str(ckpt_path), env=env)
-            print(f"Loaded checkpoint from {ckpt_path}")
+            if model_matches_env(actor, env):
+                print(f"Loaded checkpoint from {ckpt_path}")
+            else:
+                print(f"Checkpoint {ckpt_path} mismatched env; retraining")
+                result = actor.train(env, train_config)
+                actor.save(str(ckpt_path))
+                plot_path = ckpt_dir / f"{ckpt_path.stem}_metrics.png"
+                plot_training_metrics(result, plot_path, title=f"PPO {task} retrain metrics")
+                print(f"Saved training plot to {plot_path}")
+                print(f"Retrained {task}: timesteps={result.timesteps}")
         else:
             result = actor.train(env, train_config)
             actor.save(str(ckpt_path))
+            plot_path = ckpt_dir / f"{ckpt_path.stem}_metrics.png"
+            plot_training_metrics(result, plot_path, title=f"PPO {task} training metrics")
+            print(f"Saved training plot to {plot_path}")
             print(f"Trained {task}: timesteps={result.timesteps}")
         env.close()
         return actor
@@ -89,13 +111,19 @@ def main():
     eval_env = create_env(render_mode=None, task="end_to_end")
     reseed(seed, eval_env)
     inspect_stitched_switching(eval_env, stitched_actor, episodes=3)
-    stitched_mean_reward, stitched_success = evaluate_actor(eval_env, stitched_actor, episodes=10)
-    e2e_eval = e2e_actor.evaluate(eval_env, episodes=10)
+    stitched_eval = evaluate_actor(stitched_actor, eval_env, episodes=10)
+    e2e_eval = evaluate_actor(e2e_actor, eval_env, episodes=10)
     eval_env.close()
 
     print(
-        f"Stitched success={stitched_success:.3f}, mean_reward={stitched_mean_reward:.2f}; "
-        f"End-to-end success={e2e_eval.success_rate:.3f}, mean_reward={e2e_eval.mean_reward:.2f}"
+        f"Stitched success={stitched_eval.success_rate:.3f}, "
+        f"mean_ep_reward={stitched_eval.mean_episode_reward:.2f}, "
+        f"mean_step_reward={stitched_eval.mean_step_reward:.3f}, "
+        f"mean_tip_dist={stitched_eval.mean_tip_distance:.3f}; "
+        f"End-to-end success={e2e_eval.success_rate:.3f}, "
+        f"mean_ep_reward={e2e_eval.mean_episode_reward:.2f}, "
+        f"mean_step_reward={e2e_eval.mean_step_reward:.3f}, "
+        f"mean_tip_dist={e2e_eval.mean_tip_distance:.3f}"
     )
 
     pickup_video_env = create_env(render_mode="rgb_array", task="pickup")
@@ -116,8 +144,8 @@ def main():
 
 def see_envs():
     # visualize_no_actor(create_env(render_mode="rgb_array", task="end_to_end"), video_name="e2e_env")
-    visualize_no_actor(create_env(render_mode="rgb_array", task="pickup"), video_name="pickup_env")
-    # visualize_no_actor(create_env(render_mode="rgb_array", task="hammer_use"), video_name="hammer_use_env")
+    # visualize_no_actor(create_env(render_mode="rgb_array", task="pickup"), video_name="pickup_env")
+    visualize_no_actor(create_env(render_mode="rgb_array", task="hammer_use"), video_name="hammer_use_env")
 
 def pickup_only():
     seed = 696
@@ -144,6 +172,9 @@ def pickup_only():
         else:
             result = actor.train(env, train_config)
             actor.save(str(ckpt_path))
+            plot_path = ckpt_dir / f"{ckpt_path.stem}_metrics.png"
+            plot_training_metrics(result, plot_path, title=f"SAC {task} training metrics")
+            print(f"Saved training plot to {plot_path}")
             print(f"Trained {task}: timesteps={result.timesteps}")
         env.close()
         return actor
@@ -154,7 +185,41 @@ def pickup_only():
     reseed(seed, pickup_video_env)
     visualize(pickup_video_env, pickup_actor, "sac_pickup_only", show_overlay=True)
 
+def use_only():
+    seed = 696
+    train_config = TrainConfig(
+        episodes=400,
+        max_steps_per_episode=50,
+        gamma=0.95,
+        learning_rate=3e-4,
+        seed=seed,
+        show_progress=True,
+        log_every=5,
+    )
+    ckpt_dir = Path("model_checkpoints")
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+    use_actor = load_or_train_sac("hammer_use",
+                                  "sac_dense_use_v4.zip",
+                                  seed=seed,
+                                  ckpt_dir=ckpt_dir, 
+                                  train_config=train_config)
+
+    use_video_env = create_env(render_mode="rgb_array", task="hammer_use")
+    reseed(seed, use_video_env)
+    visualize(use_video_env, use_actor, "sac_hammer_use_400_50_aim_height", show_overlay=True)
+
+    eval_env = create_env(render_mode=None, task="hammer_use")
+    use_eval = evaluate_actor(use_actor, eval_env, episodes=10)
+    print(
+        f"End-to-end success={use_eval.success_rate:.3f}, "
+        f"mean_ep_reward={use_eval.mean_episode_reward:.2f}, "
+        f"mean_step_reward={use_eval.mean_step_reward:.3f}, "
+        f"mean_tip_dist={use_eval.mean_tip_distance:.3f}"
+    )
+
 if __name__ == "__main__":
     # main()
     # see_envs()
-    pickup_only()
+    # pickup_only()
+    use_only()
