@@ -1,29 +1,23 @@
-from whack_a_mole.algorithms.base import EvalResult, RLAlgorithm, TrainConfig, TrainResult
-from whack_a_mole.algorithms.ppo import PPOActor
-from whack_a_mole.algorithms.q_learning import QLearningActor, QNet
-from whack_a_mole.algorithms.reinforce import Reinforce, StochasticPolicyNet
+from whack_a_mole.actors import Actor as RLAlgorithm
+from whack_a_mole.actors import EvalResult, PPOActor, SACActor, TrainConfig, TrainResult, TrainableActor
 
 
 def make_algorithm(name: str, **kwargs) -> RLAlgorithm:
     normalized = name.strip().lower()
     if normalized == "ppo":
         return PPOActor(**kwargs)
-    if normalized == "reinforce":
-        return Reinforce(**kwargs)
-    if normalized in {"q_learning", "qlearning", "q-learning"}:
-        return QLearningActor(**kwargs)
+    if normalized == "sac":
+        return SACActor(**kwargs)
     raise ValueError(f"Unsupported algorithm '{name}'")
 
 
 __all__ = [
     "RLAlgorithm",
+    "TrainableActor",
     "TrainConfig",
     "TrainResult",
     "EvalResult",
     "PPOActor",
-    "Reinforce",
-    "StochasticPolicyNet",
-    "QNet",
-    "QLearningActor",
+    "SACActor",
     "make_algorithm",
 ]

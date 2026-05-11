@@ -16,8 +16,8 @@
 		<include file="robot_attached_hammer.xml"></include>
 
 		<body pos="1.80 0.75 0.2" name="table0">
-		<!--Updated table to be length 2 maybe need to change-->
-			<geom size="0.65 0.35 0.2" type="box" mass="2000" material="table_mat"></geom>
+		<!--Updated table to be length 0.55 maybe need to change-->
+			<geom size="0.55 0.45 0.2" type="box" mass="2000" material="table_mat"></geom>
 		</body>
 
 		<light directional="true" ambient="0.2 0.2 0.2" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" castshadow="false" pos="0 0 4" dir="0 0 -1" name="light0"></light>
