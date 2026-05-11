@@ -17,15 +17,16 @@ class PickupEnv(BaseWhackEnv):
     """
     hammer_start = np.array([1.30, 0.80, 0.48])
     hammer_start_noise = np.array([0.02, 0.02, 0.0])
-    handle_grasp_radius = 0.055
+    handle_grasp_radius = 0.08
     lifted_height = 0.50
-    grasp_close_threshold = 0.025
+    grasp_close_threshold = 0.05
     pickup_bonus = 8.0
     travel_scale = 3.0
     close_radius = 0.045
     close_reward = 3.0
     close_miss_penalty = 0.6
     max_aperture = 0.05
+    assist_grasp_closure = True
 
     def __init__(self, reward_type: str = "dense", render_mode: str | None = "human", **kwargs):
         """Initialize pickup environment with free hammer and active gripper.
@@ -125,6 +126,8 @@ class PickupEnv(BaseWhackEnv):
             # Reward closing ONLY when near the handle
             nearness_multiplier = np.exp(-15.0 * dist)
             reward += 8.0 * nearness_multiplier * closure_amount
+            # Penalize staying open while already in grasp region.
+            reward -= 1.5 * (1.0 - closure_amount)
         else:
             # Small penalty for closing fingers in empty air
             reward -= 0.5 * closure_amount
@@ -164,6 +167,11 @@ class PickupEnv(BaseWhackEnv):
         Returns:
             Tuple of ``(obs, reward, terminated, truncated, info)``.
         """
+        action = np.asarray(action, dtype=np.float32).copy()
+        grip_to_handle_before = float(np.linalg.norm(self.get_gripper_position() - self.get_hammer_handle_position()))
+        if self.assist_grasp_closure and action.shape[0] >= 4 and grip_to_handle_before < self.handle_grasp_radius:
+            action[3] = min(float(action[3]), -0.7)
+
         obs, _, terminated, truncated, info = super().step(action)
         obs["achieved_goal"] = self.get_hammer_tip_position()
         reward = float(self.compute_reward(obs["achieved_goal"], obs["desired_goal"]))
@@ -178,7 +186,8 @@ class PickupEnv(BaseWhackEnv):
         info["hammer_held"] = bool(grasped or lifted)
         info["grip_to_hammer_handle"] = grip_to_handle
         info["gripper_aperture"] = float(np.mean(gripper_qpos))
-        info["gripper_can_close"] = True
+        info["gripper_can_close"] = bool(action.shape[0] >= 4)
+        info["grasp_assist_active"] = bool(self.assist_grasp_closure and grip_to_handle_before < self.handle_grasp_radius)
         info["pickup_phase"] = getattr(self, "_last_pickup_phase", "travel")
         # debug print to check gripper aperature distance
         # gripper_qpos, _ = self.get_gripper_state()
