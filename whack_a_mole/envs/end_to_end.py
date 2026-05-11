@@ -7,6 +7,8 @@ from whack_a_mole.envs.pickup import PickupEnv
 
 
 class EndToEndEnv(PickupEnv):
+    pickup_goal_tracks_handle = False
+
     def compute_dense_reward(self, achieved_goal, goal, info=None):
         pickup_reward = super().compute_dense_reward(achieved_goal, goal, info)
         lifted = self.is_hammer_lifted()

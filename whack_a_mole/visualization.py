@@ -107,6 +107,11 @@ def visualize(env: gym.Env, algorithm=None, video_name="test", show_overlay: boo
             f"tip_speed={_fmt(info.get('hammer_tip_speed', float('nan')))} align={_fmt(info.get('hammer_tip_downward_alignment', float('nan')))}",
             f"act_xyz_norm={_fmt(action_xyz_norm)} act_grip={_fmt(action_grip)}",
             f"actor_act_xyz_norm={_fmt(info.get('hammer_use_action_xyz_norm', float('nan')))} actor_act_grip={_fmt(info.get('hammer_use_action_grip', float('nan')))}",
+            f"dist_grasp_target={info.get('grip_to_grasp_center', float('nan')):.3f}",
+            f"dist_head={info.get('grip_to_hammer_head', float('nan')):.3f} dist_tip={info.get('grip_to_hammer_tip', float('nan')):.3f}",
+            f"dist_goal={info.get('grip_to_pickup_goal', float('nan')):.3f} phase_bonus={info.get('phase_bonus', 0.0):.1f}",
+            f"grip_vz={info.get('gripper_velocity_z', float('nan')):.3f} lateral_v={info.get('gripper_lateral_speed', float('nan')):.3f} head_v={info.get('head_approach_speed', float('nan')):.3f}",
+            f"reach_dwell={info.get('reach_dwell', 0)} close_dwell={info.get('close_dwell', 0)}",
             f"success={int(bool(info.get('is_success', False)))}",
         ]
         y = 24
