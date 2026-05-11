@@ -150,8 +150,8 @@ def see_envs():
 def pickup_only():
     seed = 696
     train_config = TrainConfig(
-        episodes=150,
-        max_steps_per_episode=100,
+        episodes=400,
+        max_steps_per_episode=50,
         gamma=0.95,
         learning_rate=3e-4,
         seed=seed,
@@ -179,7 +179,7 @@ def pickup_only():
         env.close()
         return actor
 
-    pickup_actor = load_or_train("pickup", "sac_dense_pickup_head_avoid_descend_close.zip")
+    pickup_actor = load_or_train("pickup", "sac_dense_pickup_use_like.zip")
 
     pickup_video_env = create_env(render_mode="rgb_array", task="pickup")
     reseed(seed, pickup_video_env)
@@ -221,5 +221,5 @@ def use_only():
 if __name__ == "__main__":
     # main()
     # see_envs()
-    # pickup_only()
-    use_only()
+    pickup_only()
+    # use_only()

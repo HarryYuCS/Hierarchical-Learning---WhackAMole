@@ -271,7 +271,7 @@ class PickupEnv(BaseWhackEnv):
         return bool(grip_to_handle < grasp_radius and self._is_gripper_closed())
 
     def compute_dense_reward(self, achieved_goal, goal, info=None):
-        """Compute dense shaping reward for top-down open-gripper reaching.
+        """Compute simplified dense shaping reward for pickup.
 
         Args:
             achieved_goal: Unused for pickup reward.
@@ -279,95 +279,40 @@ class PickupEnv(BaseWhackEnv):
             info: Optional info dict.
 
         Returns:
-            Scalar dense reward encouraging open-gripper top-down reach.
+            Scalar dense reward encouraging handle alignment and gripping.
         """
-        del achieved_goal
-        info = info or {}
-        
-        # 1. Coordinate Mapping
+        del achieved_goal, goal
+
         grip_pos = self.get_gripper_position()
         handle_pos = self.get_hammer_handle_position()
-        active_goal = np.asarray(goal, dtype=np.float64)
-        head_pos = self.get_hammer_head_position()
-        head_side_amount = self.get_head_side_amount()
-        
-        # Distances
-        active_goal_dist = float(np.linalg.norm(grip_pos - active_goal))
-        active_goal_xy_dist = float(np.linalg.norm((grip_pos - active_goal)[:2]))
-        active_goal_z_dist = abs(float(grip_pos[2] - active_goal[2]))
-        vertical_offset = float(grip_pos[2] - active_goal[2])
-        head_dist = float(np.linalg.norm(grip_pos - head_pos))
-        head_vector = head_pos - grip_pos
-        handle_xy_shift = float(np.linalg.norm(handle_pos[:2] - self._reset_handle_xy))
-        handle_lift = max(0.0, float(handle_pos[2] - self.hammer_start[2] - 0.02))
-        gripper_velocity = np.asarray(info.get("gripper_velocity", self.get_gripper_velocity()), dtype=np.float64)
-        downward_speed = max(0.0, -float(gripper_velocity[2]))
-        lateral_speed = float(np.linalg.norm(gripper_velocity[:2]))
-        head_direction = head_vector / max(float(np.linalg.norm(head_vector)), 1e-6)
-        head_approach_speed = max(0.0, float(np.dot(gripper_velocity, head_direction)))
-        
-        # Gripper Stats
+
+        horizontal_distance = float(self.check_horizontal_distance(grip_pos, handle_pos))
+        vertical_offset = float(grip_pos[2] - handle_pos[2])
+        aim_height_error = abs(vertical_offset - self.aim_height)
+        near_for_grasp = horizontal_distance < self.strike_ready_radius
+
+        reward = -self.step_penalty - 5.0 * horizontal_distance
+        if near_for_grasp:
+            reward -= 2.0 * aim_height_error
+
         gripper_qpos, _ = self.get_gripper_state()
         gripper_aperture = float(np.mean(gripper_qpos))
-        closure_amount = np.clip(1.0 - (gripper_aperture / self.max_aperture), 0, 1)
-        close_command = float(info.get("gripper_close_command", 0.0))
-        
-        # Logical States
-        stage = getattr(self, "_pickup_stage", "hover")
-        horizontal_dist = float(np.linalg.norm((grip_pos - handle_pos)[:2]))
-        gripper_open_amount = np.clip(gripper_aperture / self.max_aperture, 0, 1)
+        grip_engagement = float(np.clip(1.0 - (gripper_aperture / self.max_aperture), 0.0, 1.0))
 
-        # 2. Top-down reach reward.
-        reward = -float(self.step_penalty)
-        reward -= self.travel_scale * active_goal_dist
-        reward -= self.horizontal_goal_scale * active_goal_xy_dist
-        reward -= self.vertical_goal_scale * active_goal_z_dist
-        reward -= 4.0 * horizontal_dist
-        reward -= self.hammer_disturbance_penalty * (handle_xy_shift + handle_lift)
-        reward -= self.head_avoid_penalty * max(0.0, (self.head_avoid_radius - head_dist) / self.head_avoid_radius)
-        reward -= self.head_approach_penalty * head_approach_speed
-        reward -= self.head_collision_penalty * max(0.0, head_side_amount / self.head_clearance_radius)
-        reward += self.handle_reach_bonus * np.exp(-20.0 * active_goal_dist)
-        if stage in {"hover", "close"}:
-            reward += self.phase_target_bonus * np.exp(-30.0 * active_goal_dist)
-            above_goal = vertical_offset > 0.0
-            ready_for_descent = active_goal_xy_dist < self.descent_ready_radius and above_goal
-            if ready_for_descent:
-                speed_error = abs(downward_speed - self.ideal_descent_velocity)
-                reward += self.descent_velocity_reward * np.exp(-25.0 * speed_error)
-                reward -= self.fast_descent_penalty * max(0.0, downward_speed - self.max_descent_velocity)
-                if downward_speed < self.min_descent_velocity and vertical_offset > self.reach_height_tolerance:
-                    reward -= 0.5
-            else:
-                reward -= self.unaligned_descent_penalty * downward_speed
-            reward -= self.lateral_velocity_penalty * lateral_speed
-            if horizontal_dist > self.hover_xy_radius:
-                safe_height = handle_pos[2] + self.hover_height * 0.5
-                reward -= self.low_while_misaligned_penalty * max(0.0, safe_height - grip_pos[2])
-            reward -= self.head_collision_penalty * max(0.0, (self.head_clearance_radius - head_dist) / self.head_clearance_radius)
-        elif stage == "reach":
-            reward += self.phase_target_bonus
-        
-        # Potential Shaping (Delta reward for moving closer)
-        if self._prev_grip_to_active_goal is not None:
-            reward += self.active_goal_progress_scale * (self._prev_grip_to_active_goal - active_goal_dist)
+        if info is not None:
+            hovering_handle = near_for_grasp and (abs(vertical_offset) < self.strike_height_tolerance)
+            if hovering_handle:
+                reward += 3.0 * grip_engagement
 
-        # 3. Keep the gripper open until the hover pose is stable, then learn to close.
-        if stage == "hover":
-            reward += self.open_gripper_reward * gripper_open_amount
-            reward -= self.early_closed_penalty * closure_amount
-            reward -= self.early_close_action_penalty * close_command
-        else:
-            near_descend_target = active_goal_dist < self.reach_radius
-            reward += self.close_action_reward * close_command * float(near_descend_target)
-            reward += self.closed_gripper_reward * closure_amount * float(near_descend_target)
-            if not near_descend_target:
-                reward -= self.early_closed_penalty * closure_amount
-                reward -= self.early_close_action_penalty * close_command
-            reward -= 4.0 * max(0.0, active_goal_dist - self.reach_radius)
+        grasped = self.is_hammer_grasped()
+        lifted = self.is_hammer_lifted()
+        if grasped:
+            reward += self.pickup_bonus
+        if lifted:
+            reward += 10.0
 
-        self._last_pickup_phase = stage
-        return reward
+        self._last_pickup_phase = "lift" if grasped else "travel"
+        return float(reward)
 
     def compute_reward(self, achieved_goal, goal, info=None):
         """Project reward entrypoint for the pickup task.
