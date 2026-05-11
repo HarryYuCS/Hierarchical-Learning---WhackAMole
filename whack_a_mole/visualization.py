@@ -93,6 +93,11 @@ def visualize(env: gym.Env, algorithm=None, video_name="test", show_overlay: boo
             f"pickup_phase={info.get('pickup_phase', 'n/a')}",
             f"held={int(bool(info.get('hammer_held', False)))} grasped={int(bool(info.get('hammer_grasped', False)))} lifted={int(bool(info.get('hammer_lifted', False)))}",
             f"dist_handle={info.get('grip_to_hammer_handle', float('nan')):.3f}",
+            f"dist_grasp_target={info.get('grip_to_grasp_center', float('nan')):.3f}",
+            f"dist_head={info.get('grip_to_hammer_head', float('nan')):.3f} dist_tip={info.get('grip_to_hammer_tip', float('nan')):.3f}",
+            f"dist_goal={info.get('grip_to_pickup_goal', float('nan')):.3f} phase_bonus={info.get('phase_bonus', 0.0):.1f}",
+            f"grip_vz={info.get('gripper_velocity_z', float('nan')):.3f} lateral_v={info.get('gripper_lateral_speed', float('nan')):.3f} head_v={info.get('head_approach_speed', float('nan')):.3f}",
+            f"reach_dwell={info.get('reach_dwell', 0)} close_dwell={info.get('close_dwell', 0)}",
             f"success={int(bool(info.get('is_success', False)))}",
         ]
         y = 24

@@ -2,8 +2,42 @@ from __future__ import annotations
 
 import numpy as np
 from stable_baselines3 import SAC
+from stable_baselines3.common.callbacks import BaseCallback
 
 from whack_a_mole.actors.base import EvalResult, TrainConfig, TrainResult, TrainableActor
+
+
+class EpisodeLogCallback(BaseCallback):
+    """Print simple per-episode SAC progress logs."""
+
+    def __init__(self, log_every: int = 10):
+        super().__init__()
+        self.log_every = max(1, int(log_every))
+        self.episode_count = 0
+        self.episode_reward = 0.0
+        self.episode_length = 0
+
+    def _on_step(self) -> bool:
+        rewards = np.asarray(self.locals.get("rewards", [0.0]), dtype=np.float64)
+        dones = np.asarray(self.locals.get("dones", [False]), dtype=bool)
+        infos = self.locals.get("infos", [{}])
+
+        self.episode_reward += float(rewards[0])
+        self.episode_length += 1
+        if dones[0]:
+            self.episode_count += 1
+            if self.episode_count % self.log_every == 0:
+                success = int(bool(infos[0].get("is_success", False)))
+                print(
+                    f"episode={self.episode_count} "
+                    f"reward={self.episode_reward:.3f} "
+                    f"length={self.episode_length} "
+                    f"success={success}",
+                    flush=True,
+                )
+            self.episode_reward = 0.0
+            self.episode_length = 0
+        return True
 
 
 class SACActor(TrainableActor):
@@ -47,7 +81,8 @@ class SACActor(TrainableActor):
             )
         else:
             self.model.set_env(env)
-        self.model.learn(total_timesteps=total_timesteps)
+        callback = EpisodeLogCallback(config.log_every) if config.show_progress else None
+        self.model.learn(total_timesteps=total_timesteps, callback=callback)
         return TrainResult(
             episode_rewards=[],
             losses=[],

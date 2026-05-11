@@ -44,7 +44,7 @@ class HammerUseObservationWrapper(gym.ObservationWrapper):
 
 
 class PickupObservationWrapper(gym.ObservationWrapper):
-    """Observation wrapper for pickup/end-to-end policy inputs (25 features)."""
+    """Observation wrapper for pickup/end-to-end policy inputs (38 features)."""
 
     def __init__(self, env):
         """Initialize pickup observation wrapper.
@@ -55,7 +55,7 @@ class PickupObservationWrapper(gym.ObservationWrapper):
         super().__init__(env)
         self.observation_space = gym.spaces.Dict(
             {
-                "observation": gym.spaces.Box(-np.inf, np.inf, (25,), dtype=np.float32),
+                "observation": gym.spaces.Box(-np.inf, np.inf, (38,), dtype=np.float32),
                 "achieved_goal": env.observation_space["achieved_goal"],
                 "desired_goal": env.observation_space["desired_goal"],
             }
@@ -68,15 +68,18 @@ class PickupObservationWrapper(gym.ObservationWrapper):
             obs: Original observation dict.
 
         Returns:
-            Dict observation with 25D policy features.
+            Dict observation with 38D policy features.
         """
         grip_pos = self.unwrapped.get_gripper_position()
         gripper_state, _ = self.unwrapped.get_gripper_state()
         handle_pos = self.unwrapped.get_hammer_handle_position()
+        head_pos = self.unwrapped.get_hammer_head_position()
         hammer_pos = self.unwrapped.get_hammer_tip_position()
         hammer_vel = self.unwrapped.get_hammer_tip_velocity()
         goal_pos = obs["desired_goal"]
+        grip_to_goal = goal_pos - grip_pos
         grip_to_handle = handle_pos - grip_pos
+        grip_to_head = head_pos - grip_pos
         tip_to_goal = goal_pos - hammer_pos
         near_handle = np.array(
             [
@@ -93,8 +96,12 @@ class PickupObservationWrapper(gym.ObservationWrapper):
                 hammer_pos,
                 hammer_vel,
                 goal_pos,
+                grip_to_goal,
                 grip_to_handle,
+                head_pos,
+                grip_to_head,
                 tip_to_goal,
+                self.unwrapped.get_pickup_stage_features(),
                 near_handle,
             ]
         ).astype(np.float32)
