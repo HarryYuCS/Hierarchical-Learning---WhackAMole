@@ -26,6 +26,8 @@ class PickupEnv(BaseWhackEnv):
     close_reward = 3.0
     close_miss_penalty = 0.6
     max_aperture = 0.05
+    handle_reach_bonus = 3.0
+    pickup_goal_tracks_handle = True
 
     def __init__(self, reward_type: str = "dense", render_mode: str | None = "human", **kwargs):
         """Initialize pickup environment with free hammer and active gripper.
@@ -65,6 +67,22 @@ class PickupEnv(BaseWhackEnv):
         mujoco.mj_forward(self.model, self.data)
         self._prev_grip_to_handle = None
         return did_reset
+
+    def _sync_pickup_goal(self, obs):
+        """Expose the handle as the active goal for pickup training."""
+        if not self.pickup_goal_tracks_handle:
+            return obs
+        handle_pos = self.get_hammer_handle_position()
+        grip_pos = self.get_gripper_position()
+        self.goal = handle_pos.copy()
+        self._move_goal_marker()
+        obs["achieved_goal"] = grip_pos.copy()
+        obs["desired_goal"] = handle_pos.copy()
+        return obs
+
+    def reset(self, *args, **kwargs):
+        obs, info = super().reset(*args, **kwargs)
+        return self._sync_pickup_goal(obs), info
 
     def is_hammer_lifted(self):
         """Return whether hammer handle is above lift threshold."""
@@ -114,6 +132,9 @@ class PickupEnv(BaseWhackEnv):
         reward = -float(self.step_penalty)
         reward -= self.travel_scale * dist
         reward -= 2.0 * height_dist  # Explicit motivation to stop hovering
+        reward += self.handle_reach_bonus * np.exp(-20.0 * dist)
+        if dist < self.close_radius:
+            reward += self.close_reward * (1.0 - dist / self.close_radius)
         
         # Potential Shaping (Delta reward for moving closer)
         if self._prev_grip_to_handle is not None:
@@ -165,7 +186,7 @@ class PickupEnv(BaseWhackEnv):
             Tuple of ``(obs, reward, terminated, truncated, info)``.
         """
         obs, _, terminated, truncated, info = super().step(action)
-        obs["achieved_goal"] = self.get_hammer_tip_position()
+        obs = self._sync_pickup_goal(obs)
         reward = float(self.compute_reward(obs["achieved_goal"], obs["desired_goal"]))
         lifted = self.is_hammer_lifted()
         grasped = self.is_hammer_grasped()

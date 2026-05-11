@@ -38,7 +38,7 @@ class HammerUseObservationWrapper(gym.ObservationWrapper):
         low_dim_obs = np.concatenate([hammer_pos, hammer_vel, goal_pos, rel_pos]).astype(np.float32)
         return {
             "observation": low_dim_obs,
-            "achieved_goal": hammer_pos,
+            "achieved_goal": np.asarray(obs["achieved_goal"], dtype=np.float32),
             "desired_goal": goal_pos,
         }
 
@@ -100,7 +100,7 @@ class PickupObservationWrapper(gym.ObservationWrapper):
         ).astype(np.float32)
         return {
             "observation": low_dim_obs,
-            "achieved_goal": hammer_pos,
+            "achieved_goal": np.asarray(obs["achieved_goal"], dtype=np.float32),
             "desired_goal": goal_pos,
         }
 
