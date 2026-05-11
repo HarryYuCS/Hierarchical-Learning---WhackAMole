@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import numpy as np
+import gymnasium as gym
 from stable_baselines3 import SAC
+from stable_baselines3.common.monitor import Monitor
 
 from whack_a_mole.actors.base import EvalResult, TrainConfig, TrainResult, TrainableActor
 from whack_a_mole.actors.callbacks import SB3MetricsCallback
@@ -28,6 +30,10 @@ class SACActor(TrainableActor):
         return action
 
     def train(self, env, config: TrainConfig) -> TrainResult:
+        if not isinstance(env, gym.wrappers.TimeLimit):
+            env = gym.wrappers.TimeLimit(env, max_episode_steps=config.max_steps_per_episode)
+        if not isinstance(env, Monitor):
+            env = Monitor(env)
         self.environment = env
         total_timesteps = config.episodes * config.max_steps_per_episode
         if self.model is None:
@@ -38,7 +44,7 @@ class SACActor(TrainableActor):
                 gamma=config.gamma,
                 seed=config.seed,
                 buffer_size=300_000,
-                learning_starts=5_000,
+                learning_starts=1_000,
                 batch_size=256,
                 tau=0.005,
                 train_freq=1,
@@ -52,14 +58,15 @@ class SACActor(TrainableActor):
             metric_keys=["train/actor_loss", "train/critic_loss", "train/ent_coef", "rollout/ep_rew_mean"]
         )
         self.model.learn(total_timesteps=total_timesteps, callback=callback)
-        losses = [x for x in callback.metrics.get("train/critic_loss", []) if not np.isnan(x)]
+        critic_series = callback.metrics.get("train/critic_loss", {"values": []}).get("values", [])
+        losses = [x for x in critic_series if not np.isnan(x)]
+        ep_rew_series = callback.metrics.get("rollout/ep_rew_mean", {"values": []}).get("values", [])
         return TrainResult(
-            episode_rewards=[],
+            episode_rewards=[x for x in ep_rew_series if not np.isnan(x)],
             losses=losses,
             timesteps=total_timesteps,
             metadata={
                 "algorithm": "sac",
-                "timesteps": callback.timesteps,
                 "metrics": callback.metrics,
             },
         )

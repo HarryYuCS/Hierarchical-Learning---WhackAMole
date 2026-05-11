@@ -80,19 +80,33 @@ def visualize(env: gym.Env, algorithm=None, video_name="test", show_overlay: boo
     )
     video.write(cv2.cvtColor(first_frame, cv2.COLOR_RGB2BGR))
 
-    def annotate(frame, step_idx, reward, info):
+    def _fmt(value, digits=3):
+        try:
+            return f"{float(value):.{digits}f}"
+        except (TypeError, ValueError):
+            return "n/a"
+
+    def annotate(frame, step_idx, reward, cumulative_reward, info, action):
         if not show_overlay:
             return frame
         import cv2
 
         out = frame.copy()
+        action = np.asarray(action, dtype=np.float32).ravel()
+        action_xyz_norm = float(np.linalg.norm(action[:3])) if action.size >= 3 else float("nan")
+        action_grip = float(action[3]) if action.size >= 4 else float("nan")
+
         lines = [
             f"step={step_idx}",
-            f"reward={reward:.3f}",
+            f"reward={reward:.3f} cum_reward={cumulative_reward:.3f}",
             f"phase={info.get('phase', 'n/a')}",
             f"pickup_phase={info.get('pickup_phase', 'n/a')}",
             f"held={int(bool(info.get('hammer_held', False)))} grasped={int(bool(info.get('hammer_grasped', False)))} lifted={int(bool(info.get('hammer_lifted', False)))}",
-            f"dist_handle={info.get('grip_to_hammer_handle', float('nan')):.3f}",
+            f"dist_handle={_fmt(info.get('grip_to_hammer_handle', float('nan')))} aperture={_fmt(info.get('gripper_aperture', float('nan')))}",
+            f"tip_dist={_fmt(info.get('hammer_tip_distance', float('nan')))} tip_xy={_fmt(info.get('hammer_tip_horizontal_distance', float('nan')))} tip_vz={_fmt(info.get('hammer_tip_velocity_z', float('nan')))}",
+            f"tip_speed={_fmt(info.get('hammer_tip_speed', float('nan')))} align={_fmt(info.get('hammer_tip_downward_alignment', float('nan')))}",
+            f"act_xyz_norm={_fmt(action_xyz_norm)} act_grip={_fmt(action_grip)}",
+            f"actor_act_xyz_norm={_fmt(info.get('hammer_use_action_xyz_norm', float('nan')))} actor_act_grip={_fmt(info.get('hammer_use_action_grip', float('nan')))}",
             f"success={int(bool(info.get('is_success', False)))}",
         ]
         y = 24
@@ -102,14 +116,16 @@ def visualize(env: gym.Env, algorithm=None, video_name="test", show_overlay: boo
             y += 22
         return out
 
+    cumulative_reward = 0.0
     for i in range(max_steps):
         action = get_action(obs)
         obs, reward, terminated, truncated, info = env.step(action)
+        cumulative_reward += float(reward)
         if terminated or truncated: break
 
         im = env.render()
         if im is not None:
-            im = annotate(im, i + 1, float(reward), info)
+            im = annotate(im, i + 1, float(reward), cumulative_reward, info, action)
             video.write(cv2.cvtColor(im, cv2.COLOR_RGB2BGR))
 
     video.release()

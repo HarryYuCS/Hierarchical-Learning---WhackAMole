@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 from stable_baselines3 import PPO
+from stable_baselines3.common.monitor import Monitor
 
 from whack_a_mole.actors.base import EvalResult, TrainConfig, TrainResult, TrainableActor
 from whack_a_mole.actors.callbacks import SB3MetricsCallback
@@ -63,6 +64,8 @@ class PPOActor(TrainableActor):
         Returns:
             Training summary with total timesteps.
         """
+        if not isinstance(env, Monitor):
+            env = Monitor(env)
         self.environment = env
         total_timesteps = config.episodes * config.max_steps_per_episode
         if self.model is None:
@@ -82,14 +85,15 @@ class PPOActor(TrainableActor):
             metric_keys=["train/loss", "train/value_loss", "train/policy_gradient_loss", "rollout/ep_rew_mean"]
         )
         self.model.learn(total_timesteps=total_timesteps, callback=callback)
-        losses = [x for x in callback.metrics.get("train/loss", []) if not np.isnan(x)]
+        loss_series = callback.metrics.get("train/loss", {"values": []}).get("values", [])
+        losses = [x for x in loss_series if not np.isnan(x)]
+        ep_rew_series = callback.metrics.get("rollout/ep_rew_mean", {"values": []}).get("values", [])
         return TrainResult(
-            episode_rewards=[],
+            episode_rewards=[x for x in ep_rew_series if not np.isnan(x)],
             losses=losses,
             timesteps=total_timesteps,
             metadata={
                 "algorithm": "ppo",
-                "timesteps": callback.timesteps,
                 "metrics": callback.metrics,
             },
         )
