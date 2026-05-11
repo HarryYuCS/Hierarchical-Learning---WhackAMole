@@ -121,20 +121,26 @@ class HammerUseEnv(PickupEnv):
         aim_height_error = abs(vertical_offset - self.aim_height)
         near_for_strike = horizontal_distance < self.strike_ready_radius
 
+        # coarse shape near the goal
         reward = -self.step_penalty - 5.0 * horizontal_distance
+
+        # shape harder when near
         if near_for_strike:
             reward -= 2.0 * aim_height_error
 
         if info is not None:
-            downward_speed = max(0.0, -float(info.get("hammer_tip_velocity_z", 0.0)))
-            above_mole = vertical_offset > 0.0
-            if near_for_strike and above_mole:
-                reward += 3.0 * downward_speed
+            # EDIT : when near for strike and within hovering distance, STRIKE!
 
-            near_mole = horizontal_distance < self.hit_radius
-            hovering = near_mole and (abs(vertical_offset) < self.strike_height_tolerance)
-            if hovering and downward_speed < self.min_downward_velocity:
-                reward -= 1.0
+            downward_speed = max(0.0, -float(info.get("hammer_tip_velocity_z", 0.0)))
+            # above_mole = vertical_offset > 0.0
+            #if near_for_strike and above_mole:
+            #     reward += 3.0 * downward_speed
+
+            # near_mole = horizontal_distance < self.hit_radius
+            hovering = near_for_strike and (abs(vertical_offset) < self.strike_height_tolerance)
+            if hovering: # and downward_speed < self.min_downward_velocity:
+                # reward -= 1.0
+                reward += 3.0 * downward_speed
 
         return float(reward)
 

@@ -200,14 +200,14 @@ def use_only():
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     use_actor = load_or_train_sac("hammer_use",
-                                  "sac_dense_use_v4.zip",
+                                  "sac_dense_use_restrict_hit.zip",
                                   seed=seed,
                                   ckpt_dir=ckpt_dir, 
                                   train_config=train_config)
 
     use_video_env = create_env(render_mode="rgb_array", task="hammer_use")
     reseed(seed, use_video_env)
-    visualize(use_video_env, use_actor, "sac_hammer_use_400_50_aim_height", show_overlay=True)
+    visualize(use_video_env, use_actor, "sac_hammer_use_restrict_hit", show_overlay=True)
 
     eval_env = create_env(render_mode=None, task="hammer_use")
     use_eval = evaluate_actor(use_actor, eval_env, episodes=10)
