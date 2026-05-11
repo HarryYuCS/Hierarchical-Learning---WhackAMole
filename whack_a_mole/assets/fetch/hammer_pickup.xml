@@ -21,10 +21,10 @@
 
 		<body name="hammer" pos="1.25 0.55 0.46" euler="-1.5708 0 1.5708">
 			<joint name="hammer:joint" type="free" damping="0.02"></joint>
-			<geom name="hammer_handle" type="cylinder" size="0.015 0.12" rgba="0.5 0.3 0.1 1" mass="0.12" condim="4" friction="1.2 0.05 0.01"></geom>
+			<geom name="hammer_handle" type="box" size="0.015 0.015 0.12" rgba="0.5 0.3 0.1 1" mass="0.2" condim="4" friction="1.0 0.2 0.05"></geom>
 			<site name="hammer_handle_site" pos="0 0 0" size="0.03" rgba="0.2 1 0.2 1"></site>
 			<body name="hammer_head" pos="0 0 0.12">
-				<geom name="hammer_head_geom" type="box" size="0.045 0.065 0.04" rgba="0.2 0.2 0.2 1" mass="0.45" condim="4" friction="1.0 0.05 0.01"></geom>
+				<geom name="hammer_head_geom" type="box" size="0.045 0.065 0.04" rgba="0.2 0.2 0.2 1" mass="0.1" condim="4" friction="1.0 0.05 0.01"></geom>
 				<site name="hammer_tip" pos="0 0.065 0" size="0.025" rgba="0 0.8 1 1"></site>
 			</body>
 		</body>
@@ -33,7 +33,7 @@
 	</worldbody>
 
 	<actuator>
-		<position ctrllimited="true" ctrlrange="0 0.2" joint="robot0:l_gripper_finger_joint" kp="30000" name="robot0:l_gripper_finger_joint" user="1"></position>
-		<position ctrllimited="true" ctrlrange="0 0.2" joint="robot0:r_gripper_finger_joint" kp="30000" name="robot0:r_gripper_finger_joint" user="1"></position>
+		<position ctrllimited="true" ctrlrange="0 0.2" joint="robot0:l_gripper_finger_joint" kp="12000" name="robot0:l_gripper_finger_joint" user="1"></position>
+		<position ctrllimited="true" ctrlrange="0 0.2" joint="robot0:r_gripper_finger_joint" kp="12000" name="robot0:r_gripper_finger_joint" user="1"></position>
 	</actuator>
 </mujoco>

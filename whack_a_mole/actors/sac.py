@@ -4,6 +4,7 @@ import numpy as np
 from stable_baselines3 import SAC
 
 from whack_a_mole.actors.base import EvalResult, TrainConfig, TrainResult, TrainableActor
+from whack_a_mole.actors.callbacks import SB3MetricsCallback
 
 
 class SACActor(TrainableActor):
@@ -47,12 +48,20 @@ class SACActor(TrainableActor):
             )
         else:
             self.model.set_env(env)
-        self.model.learn(total_timesteps=total_timesteps)
+        callback = SB3MetricsCallback(
+            metric_keys=["train/actor_loss", "train/critic_loss", "train/ent_coef", "rollout/ep_rew_mean"]
+        )
+        self.model.learn(total_timesteps=total_timesteps, callback=callback)
+        losses = [x for x in callback.metrics.get("train/critic_loss", []) if not np.isnan(x)]
         return TrainResult(
             episode_rewards=[],
-            losses=[],
+            losses=losses,
             timesteps=total_timesteps,
-            metadata={"algorithm": "sac"},
+            metadata={
+                "algorithm": "sac",
+                "timesteps": callback.timesteps,
+                "metrics": callback.metrics,
+            },
         )
 
     def evaluate(self, env, episodes: int = 10, deterministic: bool = True) -> EvalResult:

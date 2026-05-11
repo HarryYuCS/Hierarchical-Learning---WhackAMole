@@ -3,8 +3,19 @@ from pathlib import Path
 from whack_a_mole.utils import reseed
 from whack_a_mole.create_env import create_env
 from whack_a_mole.visualization import visualize, visualize_no_actor
+from whack_a_mole.training_viz import plot_training_metrics
 
 from whack_a_mole.actors import PPOActor, StitchedPPOActor, TrainConfig, SACActor
+
+
+def model_matches_env(actor, env) -> bool:
+    model = getattr(actor, "model", None)
+    if model is None:
+        return False
+    try:
+        return model.observation_space == env.observation_space and model.action_space == env.action_space
+    except Exception:
+        return False
 
 
 def evaluate_actor(env, actor, episodes: int = 10):
@@ -72,10 +83,22 @@ def main():
         ckpt_path = ckpt_dir / ckpt_name
         if ckpt_path.exists():
             actor = PPOActor.load(str(ckpt_path), env=env)
-            print(f"Loaded checkpoint from {ckpt_path}")
+            if model_matches_env(actor, env):
+                print(f"Loaded checkpoint from {ckpt_path}")
+            else:
+                print(f"Checkpoint {ckpt_path} mismatched env; retraining")
+                result = actor.train(env, train_config)
+                actor.save(str(ckpt_path))
+                plot_path = ckpt_dir / f"{ckpt_path.stem}_metrics.png"
+                plot_training_metrics(result, plot_path, title=f"PPO {task} retrain metrics")
+                print(f"Saved training plot to {plot_path}")
+                print(f"Retrained {task}: timesteps={result.timesteps}")
         else:
             result = actor.train(env, train_config)
             actor.save(str(ckpt_path))
+            plot_path = ckpt_dir / f"{ckpt_path.stem}_metrics.png"
+            plot_training_metrics(result, plot_path, title=f"PPO {task} training metrics")
+            print(f"Saved training plot to {plot_path}")
             print(f"Trained {task}: timesteps={result.timesteps}")
         env.close()
         return actor
@@ -116,8 +139,8 @@ def main():
 
 def see_envs():
     # visualize_no_actor(create_env(render_mode="rgb_array", task="end_to_end"), video_name="e2e_env")
-    visualize_no_actor(create_env(render_mode="rgb_array", task="pickup"), video_name="pickup_env")
-    # visualize_no_actor(create_env(render_mode="rgb_array", task="hammer_use"), video_name="hammer_use_env")
+    # visualize_no_actor(create_env(render_mode="rgb_array", task="pickup"), video_name="pickup_env")
+    visualize_no_actor(create_env(render_mode="rgb_array", task="hammer_use"), video_name="hammer_use_env")
 
 def pickup_only():
     seed = 696
@@ -134,7 +157,7 @@ def pickup_only():
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     def load_or_train(task: str, ckpt_name: str) -> SACActor:
-        env = create_env(render_mode="none", task=task)
+        env = create_env(render_mode=None, task=task)
         reseed(seed, env)
         actor = SACActor(environment=env)
         ckpt_path = ckpt_dir / ckpt_name
@@ -144,6 +167,9 @@ def pickup_only():
         else:
             result = actor.train(env, train_config)
             actor.save(str(ckpt_path))
+            plot_path = ckpt_dir / f"{ckpt_path.stem}_metrics.png"
+            plot_training_metrics(result, plot_path, title=f"SAC {task} training metrics")
+            print(f"Saved training plot to {plot_path}")
             print(f"Trained {task}: timesteps={result.timesteps}")
         env.close()
         return actor
@@ -154,7 +180,46 @@ def pickup_only():
     reseed(seed, pickup_video_env)
     visualize(pickup_video_env, pickup_actor, "sac_pickup_only", show_overlay=True)
 
+def use_only():
+    seed = 696
+    train_config = TrainConfig(
+        episodes=100,
+        max_steps_per_episode=100,
+        gamma=0.95,
+        learning_rate=3e-4,
+        seed=seed,
+        show_progress=True,
+        log_every=5,
+    )
+    ckpt_dir = Path("model_checkpoints")
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+    def load_or_train(task: str, ckpt_name: str) -> SACActor:
+        env = create_env(render_mode=None, task=task)
+        reseed(seed, env)
+        actor = SACActor(environment=env)
+        ckpt_path = ckpt_dir / ckpt_name
+        if ckpt_path.exists():
+            actor = SACActor.load(str(ckpt_path), env=env)
+            print(f"Loaded checkpoint from {ckpt_path}")
+        else:
+            result = actor.train(env, train_config)
+            actor.save(str(ckpt_path))
+            plot_path = ckpt_dir / f"{ckpt_path.stem}_metrics.png"
+            plot_training_metrics(result, plot_path, title=f"SAC {task} training metrics")
+            print(f"Saved training plot to {plot_path}")
+            print(f"Trained {task}: timesteps={result.timesteps}")
+        env.close()
+        return actor
+
+    pickup_actor = load_or_train("hammer_use", "sac_dense_use_v1.zip")
+
+    pickup_video_env = create_env(render_mode="rgb_array", task="hammer_use")
+    reseed(seed, pickup_video_env)
+    visualize(pickup_video_env, pickup_actor, "sac_hammer_use", show_overlay=True)
+
 if __name__ == "__main__":
     # main()
     # see_envs()
-    pickup_only()
+    # pickup_only()
+    use_only()
