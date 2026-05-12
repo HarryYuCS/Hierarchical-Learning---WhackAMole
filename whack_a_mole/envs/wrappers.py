@@ -5,7 +5,7 @@ import numpy as np
 
 
 class HammerUseObservationWrapper(gym.ObservationWrapper):
-    """Observation wrapper for hammer-use policy inputs (12 features)."""
+    """Observation wrapper for hammer-use policy inputs (17 features)."""
 
     def __init__(self, env):
         """Initialize hammer-use observation wrapper.
@@ -29,7 +29,7 @@ class HammerUseObservationWrapper(gym.ObservationWrapper):
             obs: Original observation dict.
 
         Returns:
-            Dict observation with 12D policy features.
+            Dict observation with 17D policy features.
         """
         hammer_pos = self.unwrapped.get_hammer_tip_position()
         goal_pos = obs["desired_goal"]
@@ -50,7 +50,7 @@ class HammerUseObservationWrapper(gym.ObservationWrapper):
 
 
 class PickupObservationWrapper(gym.ObservationWrapper):
-    """Observation wrapper for pickup/end-to-end policy inputs (38 features)."""
+    """Observation wrapper for pickup/end-to-end policy inputs (34 features)."""
 
     def __init__(self, env):
         """Initialize pickup observation wrapper.
@@ -61,7 +61,7 @@ class PickupObservationWrapper(gym.ObservationWrapper):
         super().__init__(env)
         self.observation_space = gym.spaces.Dict(
             {
-                "observation": gym.spaces.Box(-np.inf, np.inf, (38,), dtype=np.float32),
+                "observation": gym.spaces.Box(-np.inf, np.inf, (34,), dtype=np.float32),
                 "achieved_goal": env.observation_space["achieved_goal"],
                 "desired_goal": env.observation_space["desired_goal"],
             }
@@ -74,7 +74,7 @@ class PickupObservationWrapper(gym.ObservationWrapper):
             obs: Original observation dict.
 
         Returns:
-            Dict observation with 38D policy features.
+            Dict observation with 34D policy features.
         """
         grip_pos = self.unwrapped.get_gripper_position()
         gripper_state, _ = self.unwrapped.get_gripper_state()
@@ -107,7 +107,6 @@ class PickupObservationWrapper(gym.ObservationWrapper):
                 head_pos,
                 grip_to_head,
                 tip_to_goal,
-                self.unwrapped.get_pickup_stage_features(),
                 near_handle,
             ]
         ).astype(np.float32)
@@ -122,7 +121,7 @@ def hammer_use_obs_from_full_obs(obs: dict) -> dict:
     """Adapt full pickup/end-to-end observation to hammer-use feature format.
 
     Args:
-        obs: Observation dict containing 25D ``observation`` field.
+        obs: Observation dict containing 34D ``observation`` field.
 
     Returns:
         Observation dict compatible with hammer-use policy wrapper schema.

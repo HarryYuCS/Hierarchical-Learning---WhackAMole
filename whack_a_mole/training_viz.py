@@ -19,11 +19,6 @@ PREFERRED_METRICS = [
 ]
 
 
-def _sanitize(values: list[float]) -> np.ndarray:
-    arr = np.asarray(values, dtype=np.float64)
-    return arr[np.isfinite(arr)] if arr.size else arr
-
-
 def _moving_average(values: np.ndarray, window: int = 10) -> np.ndarray:
     if values.size < window or window <= 1:
         return values

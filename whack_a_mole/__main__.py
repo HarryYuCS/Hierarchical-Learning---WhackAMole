@@ -3,8 +3,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from whack_a_mole.actors import SACActor, StitchedPPOActor, TrainConfig
-from whack_a_mole.create_env import create_env
+from whack_a_mole.actors import SACActor, StitchedActor, TrainConfig
+from whack_a_mole.envs import create_env
 from whack_a_mole.evaluation import evaluate_actor
 from whack_a_mole.training_viz import plot_training_metrics
 from whack_a_mole.utils import reseed
@@ -147,7 +147,7 @@ def run_full_pipeline(args: argparse.Namespace) -> None:
         task="end_to_end", seed=args.seed, checkpoint_path=args.e2e_checkpoint
     )
 
-    stitched_actor = StitchedPPOActor(pickup_actor=pickup_actor, hammer_use_actor=hammer_use_actor)
+    stitched_actor = StitchedActor(pickup_actor=pickup_actor, hammer_use_actor=hammer_use_actor)
     eval_env = create_env(render_mode=None, task="end_to_end")
     reseed(args.seed, eval_env)
     inspect_stitched_switching(eval_env, stitched_actor, episodes=3)
@@ -180,15 +180,6 @@ def run_full_pipeline(args: argparse.Namespace) -> None:
             video_env.close()
 
 
-def run_train(args: argparse.Namespace) -> None:
-    if args.pipeline == "single":
-        run_single_task(args)
-    elif args.pipeline == "full":
-        run_full_pipeline(args)
-    else:
-        raise ValueError(f"Unsupported pipeline {args.pipeline}")
-
-
 def run_see_envs(args: argparse.Namespace) -> None:
     env = create_env(render_mode="rgb_array", task=args.task)
     visualize_no_actor(env, video_name=f"{args.task}_env")
@@ -209,22 +200,21 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     train_parser.add_argument("--hammer-use-checkpoint", default=None)
     train_parser.add_argument("--e2e-checkpoint", default=None)
     train_parser.add_argument("--video-name", default=None)
+    train_parser.add_argument("--seed", type=int, default=696)
+    train_parser.add_argument("--checkpoint-dir", default="model_checkpoints")
+    train_parser.add_argument("--tag", default="v1")
+    train_parser.add_argument("--episodes", type=int, default=400)
+    train_parser.add_argument("--max-steps", type=int, default=50)
+    train_parser.add_argument("--gamma", type=float, default=0.95)
+    train_parser.add_argument("--learning-rate", type=float, default=3e-4)
+    train_parser.add_argument("--log-every", type=int, default=5)
+    train_parser.add_argument("--evaluate-episodes", type=int, default=10)
+    train_parser.add_argument("--visualize", action="store_true")
+    train_parser.add_argument("--no-progress", action="store_true")
 
     envs_parser = subparsers.add_parser("see-envs", help="Render a raw environment video")
     envs_parser.add_argument("--task", choices=["pickup", "hammer_use", "end_to_end"], default="hammer_use")
-
-    for sub in [train_parser, envs_parser]:
-        sub.add_argument("--seed", type=int, default=696)
-        sub.add_argument("--checkpoint-dir", default="model_checkpoints")
-        sub.add_argument("--tag", default="v1")
-        sub.add_argument("--episodes", type=int, default=400)
-        sub.add_argument("--max-steps", type=int, default=50)
-        sub.add_argument("--gamma", type=float, default=0.95)
-        sub.add_argument("--learning-rate", type=float, default=3e-4)
-        sub.add_argument("--log-every", type=int, default=5)
-        sub.add_argument("--evaluate-episodes", type=int, default=10)
-        sub.add_argument("--visualize", action="store_true")
-        sub.add_argument("--no-progress", action="store_true")
+    envs_parser.add_argument("--seed", type=int, default=696)
 
     parser.set_defaults(command="help")
     return parser, parser.parse_args()
@@ -252,7 +242,12 @@ def print_usage_guide() -> None:
 def main() -> None:
     parser, args = parse_args()
     if args.command == "train":
-        run_train(args)
+        if args.pipeline == "single":
+            run_single_task(args)
+        elif args.pipeline == "full":
+            run_full_pipeline(args)
+        else:
+            raise ValueError(f"Unsupported pipeline {args.pipeline}")
     elif args.command == "see-envs":
         run_see_envs(args)
     elif args.command == "help":

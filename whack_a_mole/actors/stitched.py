@@ -6,8 +6,8 @@ from whack_a_mole.actors.base import Actor
 from whack_a_mole.envs.wrappers import hammer_use_obs_from_full_obs
 
 
-class StitchedPPOActor(Actor):
-    """Actor that switches between pickup and hammer-use PPO policies.
+class StitchedActor(Actor):
+    """Actor that switches between pickup and hammer-use policies.
 
     Attributes:
         pickup_actor: Policy used before the hammer is grasped.
@@ -41,7 +41,7 @@ class StitchedPPOActor(Actor):
         if not isinstance(obs, dict):
             return False
         features = np.asarray(obs.get("observation", []), dtype=np.float32)
-        if features.shape[0] < 38:
+        if features.shape[0] < 34:
             return False
         held_flag = float(features[-1])
         grip_to_handle = features[20:23]

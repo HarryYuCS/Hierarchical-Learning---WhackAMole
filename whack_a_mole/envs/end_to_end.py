@@ -7,7 +7,6 @@ from whack_a_mole.envs.pickup import PickupEnv
 
 
 class EndToEndEnv(PickupEnv):
-    pickup_goal_tracks_handle = False
     hit_bonus = 10.0
     strike_speed_threshold = 0.2
     min_downward_velocity = 0.08

@@ -99,20 +99,12 @@ def visualize(env: gym.Env, algorithm=None, video_name="test", show_overlay: boo
         lines = [
             f"step={step_idx}",
             f"reward={reward:.3f} cum_reward={cumulative_reward:.3f}",
-            f"phase={info.get('phase', 'n/a')}",
-            f"pickup_phase={info.get('pickup_phase', 'n/a')}",
+            f"phase={info.get('phase', 'n/a')} pickup_phase={info.get('pickup_phase', 'n/a')}",
             f"held={int(bool(info.get('hammer_held', False)))} grasped={int(bool(info.get('hammer_grasped', False)))} lifted={int(bool(info.get('hammer_lifted', False)))}",
-            f"dist_handle={_fmt(info.get('grip_to_hammer_handle', float('nan')))} aperture={_fmt(info.get('gripper_aperture', float('nan')))}",
-            f"tip_dist={_fmt(info.get('hammer_tip_distance', float('nan')))} tip_xy={_fmt(info.get('hammer_tip_horizontal_distance', float('nan')))} tip_vz={_fmt(info.get('hammer_tip_velocity_z', float('nan')))}",
-            f"tip_speed={_fmt(info.get('hammer_tip_speed', float('nan')))} align={_fmt(info.get('hammer_tip_downward_alignment', float('nan')))}",
+            f"grip_to_handle={_fmt(info.get('grip_to_hammer_handle', float('nan')))} aperture={_fmt(info.get('gripper_aperture', float('nan')))}",
+            f"tip_dist={_fmt(info.get('hammer_tip_distance', float('nan')))} tip_vz={_fmt(info.get('hammer_tip_velocity_z', float('nan')))} align={_fmt(info.get('hammer_tip_downward_alignment', float('nan')))}",
             f"act_xyz_norm={_fmt(action_xyz_norm)} act_grip={_fmt(action_grip)}",
-            f"actor_act_xyz_norm={_fmt(info.get('hammer_use_action_xyz_norm', float('nan')))} actor_act_grip={_fmt(info.get('hammer_use_action_grip', float('nan')))}",
-            f"dist_grasp_target={info.get('grip_to_grasp_center', float('nan')):.3f}",
-            f"dist_head={info.get('grip_to_hammer_head', float('nan')):.3f} dist_tip={info.get('grip_to_hammer_tip', float('nan')):.3f}",
-            f"dist_goal={info.get('grip_to_pickup_goal', float('nan')):.3f} phase_bonus={info.get('phase_bonus', 0.0):.1f}",
-            f"grip_vz={info.get('gripper_velocity_z', float('nan')):.3f} lateral_v={info.get('gripper_lateral_speed', float('nan')):.3f} head_v={info.get('head_approach_speed', float('nan')):.3f}",
-            f"reach_dwell={info.get('reach_dwell', 0)} close_dwell={info.get('close_dwell', 0)}",
-            f"success={int(bool(info.get('is_success', False)))}",
+            f"dropped={int(bool(info.get('hammer_dropped', False)))} strike_valid={int(bool(info.get('strike_valid', False)))} success={int(bool(info.get('is_success', False)))}",
         ]
         y = 24
         for line in lines:

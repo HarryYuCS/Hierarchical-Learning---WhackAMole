@@ -9,7 +9,6 @@ from whack_a_mole.envs.pickup import PickupEnv
 class HammerUseEnv(PickupEnv):
     """Hammer-use task initialized from a stable pre-grasped hammer state."""
 
-    debug_reset = False
     pregrasp_offset = np.array([0.0, 0.0, 0.012], dtype=np.float64)
     target_hold_aperture = 0.01
     strike_speed_threshold = 0.2
@@ -109,13 +108,6 @@ class HammerUseEnv(PickupEnv):
         info["hammer_held"] = bool(grasped)
         info["phase"] = "hammer_use"
 
-        if self.debug_reset:
-            print(
-                "HammerUse reset:",
-                "grip=", self.get_gripper_position(),
-                "handle=", self.get_hammer_handle_position(),
-                "tip=", self.get_hammer_tip_position(),
-            )
         return obs, info
 
     def compute_dense_reward(self, achieved_goal, goal, info=None):
@@ -132,17 +124,9 @@ class HammerUseEnv(PickupEnv):
             reward -= 2.0 * aim_height_error
 
         if info is not None:
-            # EDIT : when near for strike and within hovering distance, STRIKE!
-
             downward_speed = max(0.0, -float(info.get("hammer_tip_velocity_z", 0.0)))
-            # above_mole = vertical_offset > 0.0
-            #if near_for_strike and above_mole:
-            #     reward += 3.0 * downward_speed
-
-            # near_mole = horizontal_distance < self.hit_radius
             hovering = near_for_strike and (abs(vertical_offset) < self.strike_height_tolerance)
-            if hovering: # and downward_speed < self.min_downward_velocity:
-                # reward -= 1.0
+            if hovering:
                 reward += 3.0 * downward_speed
 
         return float(reward)
