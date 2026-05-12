@@ -97,6 +97,9 @@ class HammerUseEnv(PickupEnv):
         else:
             raise RuntimeError("HammerUseEnv reset failed to produce sane pre-grasp state")
 
+        self.goal = self._sample_goal()
+        self._move_goal_marker()
+
         obs = self._get_obs()
         obs["desired_goal"] = self.goal.copy()
         obs["achieved_goal"] = self.get_hammer_tip_position()

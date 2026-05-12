@@ -15,7 +15,7 @@ class StitchedPPOActor(Actor):
         lift_threshold: Distance threshold used by the switch heuristic.
     """
 
-    def __init__(self, pickup_actor, hammer_use_actor, lift_threshold: float = 0.5):
+    def __init__(self, pickup_actor, hammer_use_actor, lift_threshold: float = 0.08):
         """Initialize stitched actor.
 
         Args:
@@ -41,10 +41,12 @@ class StitchedPPOActor(Actor):
         if not isinstance(obs, dict):
             return False
         features = np.asarray(obs.get("observation", []), dtype=np.float32)
-        if features.shape[0] < 25:
+        if features.shape[0] < 38:
             return False
         held_flag = float(features[-1])
-        return bool(held_flag > 0.5)
+        grip_to_handle = features[20:23]
+        grip_to_handle_dist = float(np.linalg.norm(grip_to_handle))
+        return bool(held_flag > 0.5 and grip_to_handle_dist < self.lift_threshold)
 
     def predict(self, obs, deterministic: bool = True):
         """Predict an action from the active sub-policy.

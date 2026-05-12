@@ -27,7 +27,7 @@ class PickupEnv(BaseWhackEnv):
     close_miss_penalty = 0.6
     max_aperture = 0.05
     handle_reach_bonus = 20.0
-    pickup_goal_tracks_handle = True
+    pickup_goal_tracks_handle = False
     assist_grasp_closure = False
     early_close_action_penalty = 3.0
     early_closed_penalty = 8.0
@@ -66,6 +66,12 @@ class PickupEnv(BaseWhackEnv):
         "close": 15.0,
         "reach": 30.0,
     }
+
+    pickup_aim_height = 0.12
+    pickup_ready_radius = 0.05
+    pickup_height_tolerance = 0.03
+
+    pickup_hover_height = 0.30
 
     def __init__(self, reward_type: str = "dense", render_mode: str | None = "human", **kwargs):
         """Initialize pickup environment with free hammer and active gripper.
@@ -288,20 +294,24 @@ class PickupEnv(BaseWhackEnv):
 
         horizontal_distance = float(self.check_horizontal_distance(grip_pos, handle_pos))
         vertical_offset = float(grip_pos[2] - handle_pos[2])
-        aim_height_error = abs(vertical_offset - self.aim_height)
-        near_for_grasp = horizontal_distance < self.strike_ready_radius
+        near_for_grasp = horizontal_distance < self.pickup_ready_radius
 
         reward = -self.step_penalty - 5.0 * horizontal_distance
         if near_for_grasp:
+            aim_height_error = abs(vertical_offset - self.pickup_aim_height)
             reward -= 2.0 * aim_height_error
+        # change : require hover to enforce approach from above
+        else:
+            hover_height_error = abs(vertical_offset - self.pickup_hover_height)
+            reward -= 2.0 * hover_height_error
 
         gripper_qpos, _ = self.get_gripper_state()
         gripper_aperture = float(np.mean(gripper_qpos))
         grip_engagement = float(np.clip(1.0 - (gripper_aperture / self.max_aperture), 0.0, 1.0))
 
         if info is not None:
-            hovering_handle = near_for_grasp and (abs(vertical_offset) < self.strike_height_tolerance)
-            if hovering_handle:
+            aimed_handle = near_for_grasp and (abs(vertical_offset) < self.pickup_height_tolerance)
+            if aimed_handle:
                 reward += 3.0 * grip_engagement
 
         grasped = self.is_hammer_grasped()

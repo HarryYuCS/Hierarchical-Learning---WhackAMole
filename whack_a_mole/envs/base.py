@@ -15,24 +15,8 @@ class BaseWhackEnv(MujocoFetchEnv):
     end-to-end task variants.
 
     Attributes:
-        hit_bonus: Bonus reward added after valid strikes.
-        strike_speed_threshold: Minimum hammer-tip speed for a valid strike.
-        min_downward_velocity: Minimum downward z-velocity for a valid strike.
-        downward_alignment_threshold: Minimum directional alignment with down axis.
-        hit_radius: Horizontal distance threshold for target contact.
-        strike_ready_radius: Radius used for strike-ready shaping.
-        strike_height_tolerance: Allowed z-height error when striking.
-        aim_height: Preferred vertical offset above the mole before striking.
         step_penalty: Per-step shaping penalty.
     """
-    hit_bonus = 10.0
-    strike_speed_threshold = 0.2
-    min_downward_velocity = 0.08
-    downward_alignment_threshold = 0.65
-    hit_radius = 0.08
-    strike_ready_radius = 0.10
-    strike_height_tolerance = 0.08
-    aim_height = 0.12
     step_penalty = 0.05
     # Keep hammer horizontal and yaw it so the handle faces the robot while
     # the head points away.

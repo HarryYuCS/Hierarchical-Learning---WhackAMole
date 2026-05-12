@@ -133,7 +133,7 @@ def hammer_use_obs_from_full_obs(obs: dict) -> dict:
     hammer_pos = full[8:11]
     hammer_vel = full[11:14]
     goal_pos = full[14:17]
-    held_flag = np.array([full[24]], dtype=np.float32)
+    held_flag = np.array([full[-1]], dtype=np.float32)
     gripper_aperture = np.array([float(np.mean(gripper_state))], dtype=np.float32)
     rel_pos = goal_pos - hammer_pos
     low_dim = np.concatenate(
