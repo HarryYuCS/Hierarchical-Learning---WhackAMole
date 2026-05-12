@@ -128,12 +128,27 @@ def hammer_use_obs_from_full_obs(obs: dict) -> dict:
         Observation dict compatible with hammer-use policy wrapper schema.
     """
     full = np.asarray(obs["observation"], dtype=np.float32)
+    grip_pos = full[0:3]
+    gripper_state = full[3:5]
     hammer_pos = full[8:11]
     hammer_vel = full[11:14]
     goal_pos = full[14:17]
+    held_flag = np.array([full[24]], dtype=np.float32)
+    gripper_aperture = np.array([float(np.mean(gripper_state))], dtype=np.float32)
     rel_pos = goal_pos - hammer_pos
+    low_dim = np.concatenate(
+        [
+            hammer_pos,
+            hammer_vel,
+            goal_pos,
+            rel_pos,
+            grip_pos,
+            gripper_aperture,
+            held_flag,
+        ]
+    ).astype(np.float32)
     return {
-        "observation": np.concatenate([hammer_pos, hammer_vel, goal_pos, rel_pos]).astype(np.float32),
+        "observation": low_dim,
         "achieved_goal": np.asarray(obs["achieved_goal"], dtype=np.float32),
         "desired_goal": np.asarray(obs["desired_goal"], dtype=np.float32),
     }
