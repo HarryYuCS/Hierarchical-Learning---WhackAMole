@@ -173,4 +173,7 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+# Scratch work
 *.mp4
+analysis/*
+*.png

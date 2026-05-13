@@ -39,7 +39,7 @@ class EndToEndEnv(PickupEnv):
             return pickup_reward
 
         hammer_reward = HammerUseEnv.compute_dense_reward(self, achieved_goal, goal, info)
-        return pickup_reward + hammer_reward
+        return hammer_reward
 
     def step(self, action):
         was_in_hammer_use_phase = self._in_hammer_use_phase()
